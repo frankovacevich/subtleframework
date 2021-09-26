@@ -33,6 +33,7 @@ body{ counter-reset: fign; counter-reset: page }
   table, .subtletable{ line-height: 1.25; box-sizing: border-box !important; border-collapse: collapse; }
   table tr, .subtletable tr{ background-color: transparent }
   table td, .subtletable td{ padding: 4px; box-sizing: border-box !important; }
+  table th, .subtletable th{ padding: 4px; }
 
   // TITLES
   h1{ padding: 0px; text-align: center; font-weight: 500 !important; line-height: 1.5 !important; font-size: 2rem !important; margin: 20px 0 20px 0 }

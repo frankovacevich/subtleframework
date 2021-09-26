@@ -1,9 +1,6 @@
 @page {
   size: A4;
   margin: 0.75in;
-  @bottom-right {
-    content: counter(page);
-  }
 }
 @media print {
   .fig {
@@ -143,6 +140,9 @@ body {
 .report-page table td, .report-page .subtletable td {
   padding: 4px;
   box-sizing: border-box !important;
+}
+.report-page table th, .report-page .subtletable th {
+  padding: 4px;
 }
 .report-page h1 {
   padding: 0px;

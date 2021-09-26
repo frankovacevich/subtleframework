@@ -1,10 +1,6 @@
 @page {
   size: A4;
   margin: 0.75in;
-
-  @bottom-right {
-    content: counter(page);
-  }
 }
 
 @media print {

@@ -1,915 +1,545 @@
 class Subtle{}
 
-//map_view.js
-Subtle.MapView = class MapView{
-
-  constructor(object, parameters = {}){
-    // =========================================================================
-		// PARAMETERES
-		// =========================================================================
-
-    this.params = {
-      provider: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', // get from http://leaflet-extras.github.io/leaflet-providers/preview/
-      leaflet_options: { attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>, &copy; <a href="https://openmaptiles.org/">OpenMapTiles</a> &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors'},
-
-      lat: 0,
-      lon: 0,
-      zoom: 2, // zoom number from 2 to 20
-
-      correct_icon_x : 6,
-      correct_icon_y : 7,
-
-      show_layer_control : false,
-
-    };
-
-    for(const p in parameters){ this.params[p] = parameters[p]; };
-
-    // =========================================================================
-		// OTHER
-		// =========================================================================
-    this.object = (typeof object === "string" ? document.getElementById(object) : object);
-    this.map = L.map(this.object.id).setView([this.params.lat, this.params.lon], this.params.zoom);
-    this.control_layers = L.control.layers();
-
-    this.markers = {};
-    this.layer_groups = {};
-
-
-    this.get_icon_html = function(marker, icon, icon_left, icon_top){
-      let html = '';
-      html += '<div style="transform: translate(' + this.params.correct_icon_x + 'px,' + this.params.correct_icon_y + 'px)">';
-      html += '<div style="font-size:24px;';
-      html += 'margin-left:-' + icon_left + 'px;';
-      html += 'margin-top:-' + icon_top + 'px;';
-      //html += 'transform: rotate(' + this.markers[marker]["angle"] + 'deg);';
-      html += 'transform-origin: ' + icon_left + 'px ' + icon_top + 'px;'
-      html += '" id="' + this.object.id + "_" + marker + '" ';
-      html += '>';
-      html += icon;
-      html += '</div>';
-      html += '</div>';
-      return html;
-    }
-
-    this.update_layer_groups = function(){
-
-      this.control_layers.remove();
-      this.control_layers = L.control.layers();
-      // this.layer_groups = {};
-
-
-      for(const m in this.markers){
-        let marker = this.markers[m];
-
-        if(!(marker.group in this.layer_groups)){
-          this.layer_groups[marker.group] = [];
-        }
-
-        this.layer_groups[marker.group].push(marker.m);
-      }
-
-      for(const group in this.layer_groups){
-        var Lay = L.layerGroup(this.layer_groups[group]);
-        Lay.addTo(this.map);
-        this.control_layers.addOverlay(Lay, group);
-      }
-
-      if(this.params.show_layer_control){
-        this.control_layers.addTo(this.map);
-      }
-    }
-
-		// =========================================================================
-		// DRAW CONTROL
-		// =========================================================================
-    this.draw = function(){
-      this.map.addLayer(new L.TileLayer(this.params.provider, this.params.leaflet_options));
-
-      if(this.params.show_layer_control){
-        this.control_layers.addTo(this.map);
-
-        var ths = this;
-        this.map.on('overlayadd', function(){
-          for(const m in ths.markers){
-            ths.update_marker(m,{tooltip:ths.markers[m].tooltip});
-          }
-        });
-      }
-    }
-
-    // =========================================================================
-		// AUTO INIT
-    // =========================================================================
-    this.draw();
-
-    // =========================================================================
-		// UPDATE: MARKERS
-    // =========================================================================
-    this.update_marker = function(marker, properties = {}){
-
-      // if marker is new, create
-      if(!(marker in this.markers)){
-        this.markers[marker] = {"m" : new L.Marker([0,0])}
-
-        this.markers[marker]["m"].addTo(this.map);
-        this.markers[marker]["group"] = "default";
-        this.markers[marker]["rotation"] = 0;
-        this.markers[marker]["position"] = [0,0];
-        this.markers[marker]["icon"] = "";
-        this.markers[marker]["icon_left"] = 12;
-        this.markers[marker]["icon_top"] = 12;
-        this.markers[marker]["visible"] = true;
-        this.markers[marker]["tooltip"] = "";
-        this.markers[marker]["onclick"] = function(){};
-      }
-
-      // update marker properties
-      for(const p in properties){ this.markers[marker][p] = properties[p]; }
-
-
-      // update position
-      if("position" in properties){
-        var newLatLng = new L.LatLng(properties["position"][0], properties["position"][1]);
-        this.markers[marker]["m"].setLatLng(newLatLng);
-      }
-
-      // update icon and tooltip
-      if("icon" in properties || "icon_left" in properties || "icon_top" in properties || "icon_size" in properties || "visible" in properties || "tooltip" in properties ){
-
-        // icon
-        if("icon" in properties || "icon_left" in properties || "icon_top" in properties){
-          this.markers[marker]["m"].setIcon(new L.DivIcon({
-            className: 'my-div-icon',
-            html: this.markers[marker]["visibility"] ? "" : this.get_icon_html(marker, this.markers[marker]["icon"], this.markers[marker]["icon_left"], this.markers[marker]["icon_top"]),
-          }));
-        }
-
-
-        // tooltip
-        if(this.markers[marker]["tooltip"] != ""){
-          if(typeof tippy !== "undefined") tippy('#' + this.object.id + "_" + marker, {content: this.markers[marker]["tooltip"], allowHTML: true})
-          else console.log("Tooltip error: tippy.js not included");
-        }
-      }
-
-      // update angle
-      if("rotation" in properties){
-        document.getElementById(this.object.id + "_" + marker).style.transform = ("rotate(" + properties["rotation"] + "deg)")
-      }
-
-      // update onclick
-      if("onclick" in properties){
-        this.markers[marker]["m"].on('click', properties["onclick"])
-      }
-
-      // update groups
-      if("group" in properties){
-        this.update_layer_groups();
-      }
-
-    }
-
-    // =========================================================================
-		// UPDATE: TRACE
-    // =========================================================================
-    this.update_trace = function(trace, properties){
-      // if trace is new, create
-      if(!(trace in this.markers)){
-        this.markers[trace] = {"m" : new L.polyline([[0,0],[10,10]])}
-
-        this.markers[trace]["m"].addTo(this.map);
-        this.markers[trace]["group"] = "default";
-        this.markers[trace]["points"] = [];
-        this.markers[trace]["color"] = "#3388ff";
-        this.markers[trace]["width"] = 2;
-        this.markers[trace]["visible"] = true;
-        this.markers[trace]["onclick"] = function(){};
-        this.markers[trace]["onhover"] = function(){};
-      }
-
-      // update trace properties
-      for(const p in properties){ this.markers[trace][p] = properties[p]; }
-
-      // update points
-      if("points" in properties){
-        this.markers[trace]["m"].setLatLngs(properties["points"]);
-      }
-
-      // update color and other styles
-      if("color" in properties){ this.markers[trace]["m"].setStyle({color: properties["color"]}) }
-      if("width" in properties){ this.markers[trace]["m"].setStyle({weight: properties["weight"]}) }
-
-      // update onclick
-      if("onclick" in properties){
-        this.markers[trace]["m"].on('click', properties["onclick"]);
-      }
-
-      // update onhover
-      if("onhover" in properties){
-        this.markers[trace]["m"].on('mouseover', properties["onhover"]);
-      }
-
-      // update groups
-      if("group" in properties){
-        this.update_layer_groups();
-      }
-
-    }
-
-    // =========================================================================
-		// UPDATE: CIRCLE
-    // =========================================================================
-    this.update_circle = function(circle, properties){
-      // if circle is new, create
-      if(!(circle in this.markers)){
-        this.markers[circle] = {"m" : new L.circle([0,0])}
-
-        this.markers[circle]["m"].addTo(this.map);
-        this.markers[circle]["group"] = "default";
-        this.markers[circle]["radius"] = 0;
-        this.markers[circle]["position"] = [0,0];
-        this.markers[circle]["color"] = "#3388ff";
-        this.markers[circle]["opacity"] = 0.5;
-        this.markers[circle]["border_color"] = "#3388ff";
-        this.markers[circle]["border_width"] = 1;
-        this.markers[circle]["visible"] = true;
-        this.markers[circle]["onclick"] = function(){};
-        this.markers[circle]["onhover"] = function(){};
-      }
-
-      // update circle properties
-      for(const p in properties){ this.markers[circle][p] = properties[p]; }
-
-      // update position
-      if("position" in properties){
-        var newLatLng = new L.LatLng(properties["position"][0], properties["position"][1]);
-        this.markers[circle]["m"].setLatLng(newLatLng);
-      }
-
-      // update radius
-      if("radius" in properties){
-        this.markers[circle]["m"].setRadius(properties["radius"]);
-      }
-
-      // update color and other styles
-      if("color" in properties){ this.markers[circle]["m"].setStyle({fillColor: properties["color"]}) }
-      if("opacity" in properties){ this.markers[circle]["m"].setStyle({fillOpacity: properties["opacity"]}) }
-      if("border_color" in properties){ this.markers[circle]["m"].setStyle({color: properties["border_color"]}) }
-      if("border_width" in properties){ this.markers[circle]["m"].setStyle({weight: properties["border_width"]}) }
-
-      // update onclick
-      if("onclick" in properties){
-        this.markers[circle]["m"].on('click', properties["onclick"]);
-      }
-
-      // update onhover
-      if("onhover" in properties){
-        this.markers[circle]["m"].on('mouseover', properties["onhover"]);
-      }
-
-      // update groups
-      if("group" in properties){
-        this.update_layer_groups();
-      }
-
-    }
-
-    // =========================================================================
-		// UPDATE: POLYGON
-    // =========================================================================
-    this.update_polygon = function(polygon, properties){
-      // if polygon is new, create
-      if(!(polygon in this.markers)){
-        this.markers[polygon] = {"m" : new L.polygon([[0,0],[10,10]])}
-
-        this.markers[polygon]["m"].addTo(this.map);
-        this.markers[polygon]["group"] = "default";
-        this.markers[polygon]["points"] = [];
-        this.markers[polygon]["color"] = "#3388ff";
-        this.markers[polygon]["opacity"] = 0.5;
-        this.markers[polygon]["border_color"] = "#3388ff";
-        this.markers[polygon]["border_width"] = 1;
-        this.markers[polygon]["visible"] = true;
-        this.markers[polygon]["onclick"] = function(){};
-        this.markers[polygon]["onhover"] = function(){};
-      }
-
-      // update polygon properties
-      for(const p in properties){ this.markers[polygon][p] = properties[p]; }
-
-      // update points
-      if("points" in properties){
-        this.markers[polygon]["m"].setLatLngs(properties["points"]);
-      }
-
-      // update color and other styles
-      if("color" in properties){ this.markers[polygon]["m"].setStyle({fillColor: properties["color"]}) }
-      if("opacity" in properties){ this.markers[polygon]["m"].setStyle({fillOpacity: properties["opacity"]}) }
-      if("border_color" in properties){ this.markers[polygon]["m"].setStyle({color: properties["border_color"]}) }
-      if("border_width" in properties){ this.markers[polygon]["m"].setStyle({weight: properties["border_width"]}) }
-
-      // update onclick
-      if("onclick" in properties){
-        this.markers[polygon]["m"].on('click', properties["onclick"]);
-      }
-
-      // update onhover
-      if("onhover" in properties){
-        this.markers[polygon]["m"].on('mouseover', properties["onhover"]);
-      }
-
-      // update groups
-      if("group" in properties){
-        this.update_layer_groups();
-      }
-    }
-
-
+//rounding.js
+Subtle.ROUNDING = 2;
+
+Subtle.ROUND = function(number, dec = -1){
+  if(dec == -1) dec = Subtle.ROUNDING;
+  if(typeof number != "number") return number;
+  let d = {
+    0: 1,
+    1: 10,
+    2: 100,
+    3: 1000,
+    4: 10000,
+    5: 100000,
+    6: 1000000,
   }
-
+  return Math.round(number * d[dec]) / d[dec];
 }
 
 
-//line_plot.js
-Subtle.LinePlot = class LinePlot{
-
-  constructor(object, parameters){
-
-    this.params = {
-      y_max : 1,
-      y_min : -1,
-
-      x_min : 0,
-      x_max : 1,
-      values_x : [0],
-
-      direction: 'horizontal', // horizontal, vertical
-
-      show_grid : true,
-      show_points : true,
-      show_ticks : false,
-      ticks_major : [1,-1],
-      ticks_minor : [0.2,-0.2],
-
-      show_labels : false,
-      label_offset : 30,
-      labels : [""],
-
-      show_values : false,
-      value_offset : 30,
-
-      color : Subtle.COLORS["primary"],
-      stroke_width : 2,
-      grid_stroke_width : 1,
-
-    };
-
-    for(const p in parameters){ this.params[p] = parameters[p]; };
-
-
-    // =========================================================================
-    // OTHER
-    // =========================================================================
-    this.object = (typeof object === "string" ? document.getElementById(object) : object);
-    this.values_x = this.params.values_x;
-    this.values_y = [0];
-
-    // =========================================================================
-    // USEFUL FUNCTIONS
-    // =========================================================================
-    // scaling helper functions
-    // transform functions are flexible to allow swapping the x and y axis (vertical or horizontal)
-    this.transform_y = function(v, v_max, v_min, v_offset_top, v_offset_bottom){ return v_offset_top + (v_max - v) * (this.object.offsetHeight - v_offset_top - v_offset_bottom) / (v_max - v_min); }
-    this.transform_x = function(v, v_max, v_min, v_offset_left, v_offset_right){ return v_offset_left + (this.object.offsetWidth - v_offset_left - v_offset_right) * (v - v_min) / (v_max - v_min); }
-
-    // =========================================================================
-    // DRAW CONTROL
-    // =========================================================================
-    this.draw = function(){
-
-      // get size
-      let height = this.object.offsetHeight;
-      let width = this.object.offsetWidth;
-
-      let svg_ = "";
-
-      // swap transformation functions if vertical
-      var parent = this;
-      let t_x = function(x){ return parent.transform_x(x,parent.params.x_max, parent.params.x_min, 10, 10) };
-      let t_y = function(y){ return parent.transform_y(y,parent.params.y_max, parent.params.y_min, parent.params.show_values ? parent.params.value_offset : 1, parent.params.show_labels ? parent.params.label_offset : 1) };
-      if(this.params.direction == "vertical"){
-        t_x = function(x){ return parent.transform_y(x,parent.params.x_max, parent.params.x_min, 10, 10) };
-        t_y = function(y){ return parent.transform_x(y,parent.params.y_max, parent.params.y_min, parent.params.show_labels ? parent.params.label_offset : 1, parent.params.show_values ? parent.params.value_offset : 1) };
-      }
-
-      // 1) Draw grid
-      // ============
-      let grid_style = {stroke_color: Subtle.COLORS["control"], stroke_width: this.params.grid_stroke_width};
-
-      for(let i = 0; i < this.values_x.length; i++){
-        // draw line from y_min to y_max
-        if(this.params.show_grid){
-          let x0 = t_x(this.values_x[i]);
-          let y0 = t_y(this.params.y_min);
-          let x1 = t_x(this.values_x[i]);
-          let y1 = t_y(this.params.y_max);
-
-          if(this.params.direction == "horizontal") { svg_ += Subtle.svg_line(x0, y0, x1, y1, grid_style) }
-          else { svg_ += Subtle.svg_line(y0, x0, y1, x1, grid_style) }
-        }
-
-        if(this.params.show_ticks){
-          for(const tick in this.params.ticks_major){
-            let x0 = t_x(this.values_x[i])-10;
-            let x1 = t_x(this.values_x[i])+10;
-            let y = t_y(this.params.ticks_major[tick]);
-
-            if(this.params.direction == "horizontal") { svg_ += Subtle.svg_line(x0, y, x1, y, grid_style); }
-            else { svg_ += Subtle.svg_line(y, x0, y, x1, grid_style); }
-          }
-          for(const tick in this.params.ticks_minor){
-            let x0 = t_x(this.values_x[i])-5;
-            let x1 = t_x(this.values_x[i])+5;
-            let y = t_y(this.params.ticks_minor[tick]);
-
-            if(this.params.direction == "horizontal") { svg_ += Subtle.svg_line(x0, y, x1, y, grid_style); }
-            else { svg_ += Subtle.svg_line(y, x0, y, x1, grid_style); }
-          }
-        }
-      }
-
-
-      // 2) Draw plot
-      // ============
-      // get styles for svg
-      let plot_style = { stroke_color: (this.params.color in Subtle.COLORS ? Subtle.COLORS[this.params.color] : this.params.color), stroke_width: this.params.stroke_width, stroke_linecap: "round" };
-      let circle_style = { fill_color: (this.params.color in Subtle.COLORS ? Subtle.COLORS[this.params.color] : this.params.color), stroke_width:0 };
-
-      // start path, draw first point
-      let x = t_x(this.values_x[0]);
-      let y = t_y(this.values_y[0]);
-
-      let path = "";
-      if(this.params.direction == "horizontal") {
-        path = '<path d=" M ' + x + ' ' + y + ' ';
-        if(this.params.show_points) svg_ += Subtle.svg_circle(x,y,this.params.stroke_width*2,circle_style);
-      } else {
-        path = '<path d=" M ' + y + ' ' + x + ' ';
-        if(this.params.show_points) svg_ += Subtle.svg_circle(y,x,this.params.stroke_width*2,circle_style);
-      }
-
-      // draw path point by point
-      for(let i = 1; i < this.values_x.length; i++){
-        let x = t_x(this.values_x[i]);
-        let y = t_y(this.values_y[i]);
-
-        if(this.params.direction == "horizontal") {
-          path += 'L ' + x + ' ' + y + ' ';
-          if(this.params.show_points) svg_ += Subtle.svg_circle(x,y,this.params.stroke_width*2,circle_style);
-        } else {
-          path += 'L ' + y + ' ' + x + ' ';
-          if(this.params.show_points) svg_ += Subtle.svg_circle(y,x,this.params.stroke_width*2,circle_style);
-        }
-
-      }
-
-      // add path to svg
-      svg_ += path + '" ' + Subtle.svg_style(plot_style) + ' />';
-
-      // 3) Draw labels
-      // ==============
-      if(this.params.show_labels){
-        for(const i in this.params.labels){
-          let x = t_x(this.values_x[i]);
-          let y = t_y(this.params.y_min);
-
-          if(this.params.direction == "horizontal") {
-            svg_ += Subtle.svg_text(x,y+10,this.params.labels[i],{center_vertically : true, anchor: "middle", font_size:"16px" })
-          } else {
-            svg_ += Subtle.svg_text(y-10,x,this.params.labels[i],{center_vertically : true, anchor: "end", font_size:"16px" })
-          }
-        }
-      }
-
-      // 4) Draw values
-      // ==============
-      if(this.params.show_values){
-        for(const i in this.values_x){
-          let x = t_x(this.values_x[i]);
-          let y = t_y(this.params.y_max);
-
-          if(this.params.direction == "horizontal") {
-            svg_ += Subtle.svg_text(x,y-10,this.values_y[i],{center_vertically : true, anchor: "middle", font_size:"16px" })
-          } else {
-            svg_ += Subtle.svg_text(y+10,x,this.values_y[i],{center_vertically : true, anchor: "start", font_size:"16px" })
-          }
-        }
-      }
-
-
-      // 5) Draw control
-      // ===============
-      let content = Subtle.svg_markup(width, height, svg_);
-
-
-      this.object.innerHTML = content;
-
-    }
-
-    // =========================================================================
-    // UPDATE CONTROL
-    // =========================================================================
-    this.update = function(values, index = -1){
-
-      if(index == -1){
-        this.values_y = values;
-      }
-      else{
-        this.values_y[index = values];
-      }
-
-      this.draw();
-
-
-    }
-  }
-
-}
-
-
-//gauge_advanced.js
-Subtle.GaugeHistoric = class GaugeHistoric {
+//plotly.js
+Subtle.PlotlyObject = class PlotlyObject{
 
     constructor(object, parameters){
 
-    // =========================================================================
-    // PARAMETERES
-    // =========================================================================
-    this.params = {
-        inner_padding : 3,
-        history_length: 3600,
-        t0: "",
-    };
+        this.obj = (typeof object === "string" ? document.getElementById(object) : object);
 
-    for(const p in parameters){ this.params[p] = parameters[p]; };
+        this.traces = [];
 
-    // =========================================================================
-    // OTHER
-    // =========================================================================
-    this.object = (typeof object === "string" ? document.getElementById(object) : object);
+        //this.annotations = [];
 
-    this.gauge = new Subtle.Gauge(this.object, this.params);
+        this.layout = {
+            margin: { l: 30, r: 20, b: 30, t: 30, pad: 5 },
+            showlegend: false,
+            legend: { orientation: "h", x:0, y:1.2 },
+            xaxis: { title: "" },
+            yaxis: { title: "" },
+            dragmode: 'zoom',
+            hovermode: 'closest',
+        }
 
-    this.current_value = (this.params.max_val + this.params.min_val) * 0.5;
+        for(const p in parameters){ this.layout[p] = parameters[p]; };
 
-    this.history = [];
-    this.history_t = [];
+        this.options = {
+            displaylogo: false,
+            displayModeBar: false,
+        }
 
-    // ===============================================================================
-    // DRAW CONTROL
-    // ===============================================================================
-    this.draw = function(){
-
-        this.gauge.current_value = this.current_value;
-
-        let forced_min = Math.min( ...this.history );
-        let forced_max = Math.max( ...this.history );
-
-        if(forced_min < this.params.min_val) forced_min = this.params.min_val;
-        if(forced_max > this.params.max_val) forced_max = this.params.max_val;
-        this.gauge.forced_min_value = forced_min;
-        this.gauge.forced_max_value = forced_max;
-
-        this.gauge.draw();
+        this.pie_chart_index = 0;
 
     }
 
-    // ===============================================================================
-    // UPDATE
-    // ===============================================================================
-    this.update = function(value, time = ""){
-
-        this.current_value = value;
-
-        // add time and value
-        if(time == "") time = Math.floor(new Date() / 1000);
-        else time = Math.floor(new Date(time) / 1000);
-
-        this.history.push(value);
-        this.history_t.push(time);
-
-        // remove old times
-        let t0 = this.params.t0 == "" ?  Math.floor(new Date() / 1000) :  Math.floor(new Date(this.params.t0 / 1000));
-        for (var i = this.history_t.length -1; i > 0; i--) {
-            if(t0 - this.history_t[i] > this.params.history_length) break;
-        }
-
-        this.history.splice(0, i);
-        this.history_t.splice(0, i);
-
-        //
-        this.draw();
+    draw(){
+        //this.layout.annotations = this.annotations;
+        this.traces.sort(function(a, b){return a.zindex-b.zindex});
+        Plotly.newPlot(this.obj, this.traces, this.layout, this.options);
     }
 
-    }
-}
+    /////////////////////////////////////////////////////////////////////
 
+    add_text(x, y, text, parameters){
 
-//scale.js
-Subtle.Scale = class Scale{
+        if(!(x instanceof Array)){ x = [x] }
+        if(!(y instanceof Array)){ y = [y] }
+        if(!(text instanceof Array)){ text = [text] }
 
-    constructor(object, parameters){
-
-    this.params = {
-        min_val : 0,
-        max_val : 1,
-
-        vertical : false,
-        color: "primary",
-        background_color: "control",
-        indicator_color: "control",
-        indicator_size: 10,
-
-        border_radius : 3,
-        bar_width : 20,
-        inner_padding : 5,
-        offset : 10,
-
-        limit_low : NaN,
-        limit_high : NaN,
-        show_limit_labels : false,
-        shade_limits : true,
-        ticks : [],
-
-        enable_history : true,
-        history_length : 3600, // length in seconds
-
-        rounding : 2,
-    };
-
-    for(const p in parameters){ this.params[p] = parameters[p]; };
-
-    // =========================================================================
-    // OTHER
-    // =========================================================================
-    this.object = (typeof object === "string" ? document.getElementById(object) : object);
-
-    this.line_limit_style = { stroke_color: "#000000", stroke_width: 1}
-    this.label_style = { font_size:'16px', center_vertically: true };
-
-    this.transform_v = function(v){ return (v - this.params.min_val) / (this.params.max_val - this.params.min_val) }
-
-    this.value = 0.5;
-    this.last_time = new Date();
-
-    this.history = [];
-    this.history_t = [];
-
-    // =========================================================================
-  	// DRAW CONTROL
-  	// =========================================================================
-    this.draw = function(){
-        let params_color = this.params.color in Subtle.COLORS ? Subtle.COLORS[this.params.color] : this.params.color;
-        let params_background_color = this.params.background_color in Subtle.COLORS ? Subtle.COLORS[this.params.background_color] : this.params.background_color;
-        let params_indicator_color = this.params.indicator_color in Subtle.COLORS ? Subtle.COLORS[this.params.indicator_color] : this.params.indicator_color;
-
-
-        let height = this.object.offsetHeight;
-        let width = this.object.offsetWidth;
-
-        let cx = width*0.5 + this.params.offset;
-        let cy = height*0.5;
-
-        if(!this.params.vertical){
-            let aux = height;
-            height = width;
-            width = aux;
-
-            cx = width*0.5 + this.params.offset;
-            cy = height*0.5;
+        let params_ = {
+            x: x,
+            y: y,
+            mode: 'text',
+            text: text,
+            textposition: "middle center", //top,middle,bottom left,center,right
+            showlegend: false,
+            //textangle: 0,
+            //showarrow: false,
+            //align: "center", // left, center, right
+            //valign: "middle", //top, middle, bottom
+            zindex: 9999,
         }
 
-        let svg_ = "";
+        for(const p in parameters){ params_[p] = parameters[p]; };
 
+        //this.annotations.push(params_);
+        this.traces.push(params_);
 
-        // draw background rectangle
-        let bar_w = this.params.bar_width;
-        let bgstyle = {fill_color: params_background_color, stroke_width: 0};
-        if(this.params.vertical){
-            svg_ += Subtle.svg_rectangle(cx-bar_w*0.5, 0, bar_w, height, bgstyle, this.params.border_radius);
-        } else {
-            svg_ += Subtle.svg_rectangle(0, cx-bar_w*0.5, height, bar_w, bgstyle, this.params.border_radius);
-        }
-
-        // draw limits
-        /*let label_style = { anchor: "end", font_size:'16px', center_vertically: true };
-
-        if(!Number.isNaN(this.params.limit_high) && !this.params.shade_limits){
-            let limit_y = height*this.transform_v(this.params.limit_high);
-            if(this.params.vertical){
-                svg_ += Subtle.svg_line(cx-bar_w*0.5, limit_y, cx+bar_w*0.5, limit_y, this.line_limit_style);
-                
-            } else {
-                svg_ += Subtle.svg_line(limit_y, cx-bar_w*0.5, limit_y, cx+bar_w*0.5, this.line_limit_style);
-                //svg_ += Subtle.svg_rectangle(limit_y, cx-bar_w*0.5, height-limit_y, bar_w, { fill_color: "#888888", stroke_width: 0 }, this.params.border_radius);
-                //svg_ += Subtle.svg_rectangle(limit_y, cx-bar_w*0.5, 10, bar_w, { fill_color: "#888888", stroke_width: 0 }, 0);
-            }
-
-            // label
-            if(this.params.show_limit_labels){
-                if(this.params.vertical){
-                    svg_ += Subtle.svg_text(limit_y, cx-bar_w*0.5-3, Subtle.ROUND(this.params.limit_high, this.params.rounding), label_style)
-                } else {
-                    label_style.anchor = "middle";
-                    svg_ += Subtle.svg_text(limit_y, cx-bar_w*0.5-10, Subtle.ROUND(this.params.limit_high, this.params.rounding), label_style)
-                }
-            }
-
-        }
-        if(!Number.isNaN(this.params.limit_low) && !this.params.shade_limits){
-            let limit_y = height*this.transform_v(this.params.limit_low);
-            if(this.params.vertical){
-                svg_ += Subtle.svg_line(cx-bar_w*0.5, limit_y, cx+bar_w*0.5, limit_y, this.line_limit_style);
-            } else {
-                svg_ += Subtle.svg_line(limit_y, cx-bar_w*0.5, limit_y, cx+bar_w*0.5, this.line_limit_style);
-            }
-
-            // label
-            if(this.params.show_limit_labels){
-                if(this.params.vertical){
-                    svg_ += Subtle.svg_text(cx-bar_w*0.5-3, limit_y, Subtle.ROUND(this.params.limit_low, this.params.rounding), label_style)
-                } else {
-                    label_style.anchor = "middle";
-                    svg_ += Subtle.svg_text(limit_y, cx-bar_w*0.5-10, Subtle.ROUND(this.params.limit_low, this.params.rounding), label_style)
-                }
-
-            }
-
-        }*/
-
-        ///////
-        if(this.params.shade_limits){
-            let shade_color = Subtle.COLOR_MODE == "dark" ? "#EDEDED" : "#959595";
-
-            let lh = !Number.isNaN(this.params.limit_high) ? height*this.transform_v(this.params.limit_high) : height;
-            let lw = !Number.isNaN(this.params.limit_low) ? height*this.transform_v(this.params.limit_low) : 0;
-    
-            if(!Number.isNaN(this.params.limit_low) && !Number.isNaN(this.params.limit_high)){
-                if(this.params.vertical){
-                    svg_ += Subtle.svg_rectangle(cx-bar_w*0.5, lw, bar_w, lh-lw, { fill_color: shade_color, stroke_width: 0 }, 0);
-                } else {
-                    svg_ += Subtle.svg_rectangle(lw, cx-bar_w*0.5, lh-lw, bar_w, { fill_color: shade_color, stroke_width: 0 }, 0);    
-                }
-            }
-            else if(!Number.isNaN(this.params.limit_high)){
-                if(this.params.vertical){
-                    svg_ += Subtle.svg_rectangle(cx-bar_w*0.5, lw, bar_w, lh-lw, { fill_color: shade_color, stroke_width: 0 }, this.params.border_radius);
-                    svg_ += Subtle.svg_rectangle(cx-bar_w*0.5, (lh+lw)*0.5, bar_w, (lh-lw)*0.5, { fill_color: shade_color, stroke_width: 0 }, 0);    
-                } else {
-                    svg_ += Subtle.svg_rectangle(lw, cx-bar_w*0.5, lh-lw, bar_w, { fill_color: shade_color, stroke_width: 0 }, this.params.border_radius);
-                    svg_ += Subtle.svg_rectangle((lh+lw)*0.5, cx-bar_w*0.5, (lh-lw)*0.5, bar_w, { fill_color: shade_color, stroke_width: 0 }, 0);    
-                }
-            }
-            else if(!Number.isNaN(this.params.limit_low)){
-                if(this.params.vertical){
-                    svg_ += Subtle.svg_rectangle(cx-bar_w*0.5, lw, bar_w, lh-lw, { fill_color: shade_color, stroke_width: 0 }, this.params.border_radius);
-                    svg_ += Subtle.svg_rectangle(cx-bar_w*0.5, lw, bar_w, (lh-lw)*0.5, { fill_color: shade_color, stroke_width: 0 }, 0);
-                } else {
-                    svg_ += Subtle.svg_rectangle(lw, cx-bar_w*0.5, lh-lw, bar_w, { fill_color: shade_color, stroke_width: 0 }, this.params.border_radius);
-                    svg_ += Subtle.svg_rectangle(lw, cx-bar_w*0.5, (lh-lw)*0.5, bar_w, { fill_color: shade_color, stroke_width: 0 }, 0);
-                }
-            }
-        } else {
-            if(!Number.isNaN(this.params.limit_low)){
-                let limit_y = height*this.transform_v(this.params.limit_low);
-                if(this.params.vertical){
-                    svg_ += Subtle.svg_line(cx-bar_w*0.5, limit_y, cx+bar_w*0.5, limit_y, this.line_limit_style);
-                } else {
-                    svg_ += Subtle.svg_line(limit_y, cx-bar_w*0.5, limit_y, cx+bar_w*0.5, this.line_limit_style);
-                }
-            }
-
-            if(!Number.isNaN(this.params.limit_high) && !this.params.shade_limits){
-                let limit_y = height*this.transform_v(this.params.limit_high);
-                if(this.params.vertical){
-                    svg_ += Subtle.svg_line(cx-bar_w*0.5, limit_y, cx+bar_w*0.5, limit_y, this.line_limit_style);
-                } else {
-                    svg_ += Subtle.svg_line(limit_y, cx-bar_w*0.5, limit_y, cx+bar_w*0.5, this.line_limit_style);
-                }
-            }    
-        }
-
-
-        // ticks
-        for(const item in this.params.ticks){
-            let tick = height * this.transform_v(this.params.ticks[item]);
-            if(this.params.vertical){
-                svg_ += Subtle.svg_line(cx, tick, cx+bar_w*0.5, tick, this.line_limit_style);
-                svg_ += Subtle.svg_text(cx+bar_w*0.5+5, tick, Subtle.ROUND(this.params.ticks[item], this.params.rounding), this.label_style)
-            } else {
-                this.label_style.anchor = "middle";
-                svg_ += Subtle.svg_line(tick, cx, tick, cx+bar_w*0.5, this.line_limit_style);
-                svg_ += Subtle.svg_text(tick, cx+bar_w*0.5+10, Subtle.ROUND(this.params.ticks[item], this.params.rounding), this.label_style)
-            }
-        }
-
-
-        // draw values retangle
-        if(this.history.length > 0){
-            let y0 = height * this.transform_v( Math.min(...this.history) );
-            let y1 = height * this.transform_v( Math.max(...this.history) );
-            let style = {fill_color: params_color, stroke_width: 0};
-            if(this.params.vertical){
-                svg_ += Subtle.svg_rectangle(cx-bar_w*0.5+this.params.inner_padding, y0, bar_w - this.params.inner_padding*2, y1-y0, style, this.params.border_radius*0.5)
-            } else {
-                svg_ += Subtle.svg_rectangle(y0, cx-bar_w*0.5+this.params.inner_padding, y1-y0, bar_w - this.params.inner_padding*2, style, this.params.border_radius*0.5)
-            }
-        }
-
-        // draw indicator (small triangle)
-        let y = height * this.transform_v( this.value );
-        let path = '<path d=" M ';
-        let indicator_dy = this.params.indicator_size * 0.577;
-        if(this.params.vertical){
-            path += (cx-bar_w*0.5) + ' ' + y;
-            path += ' L ' + (cx-bar_w*0.5-this.params.indicator_size) + ' ' + (y-indicator_dy);
-            path += ' L ' + (cx-bar_w*0.5-this.params.indicator_size) + ' ' + (y+indicator_dy);
-            path += ' Z" ' + Subtle.svg_style({fill_color: params_indicator_color, stroke_width:0 })  + ' />';
-
-        } else {
-            path += y + ' ' + (cx-bar_w*0.5);
-            path += ' L ' + (y-indicator_dy) + ' ' + (cx-bar_w*0.5-this.params.indicator_size);
-            path += ' L ' + (y+indicator_dy) + ' ' + (cx-bar_w*0.5-this.params.indicator_size);
-            path += ' Z" ' + Subtle.svg_style({fill_color: params_indicator_color, stroke_width:0 })  + ' />';
-
-        }
-        svg_ += path;
-
-        // draw
-        if(this.params.vertical){
-            let content = Subtle.svg_markup(width, height, svg_);
-            this.object.innerHTML = content;
-        } else {
-            let content = Subtle.svg_markup(height, width, svg_);
-            this.object.innerHTML = content;
-        }
-
+        return;
     }
 
-    // =========================================================================
-  	// UPDATE
-  	// =========================================================================
-    this.update = function(value, time = ""){
-
-        this.value = value;
-        if(value < this.params.min_val) this.value = this.params.min_val;
-        if(value > this.params.max_val) this.value = this.params.max_val;
-
+    add_scatter(data, parameters){
         /*
-        // calculate elapsed time from the last time this function was called in seconds
-        var current_time = new Date();
-        if(time != ""){ current_time = new Date(time); }
-        var time_diff = (current_time - this.last_time) / 1000;
-        this.last_time = current_time;
-
-        //
-        let min_i = 0;
-        for (var i = 0; i < this.history_t.length; i++) {
-            this.history_t[i] = this.history_t[i] + time_diff;
-            if(this.history_t[i] > this.params.history_length) { min_i = i+1; }
-        }
-        this.history.push(value);
-        this.history_t.push(0);
-
-        this.history.splice(0, min_i);
-        this.history_t.splice(0, min_i);
+        data = [[x0, x1, x2, ... , xn], [y0, y1, y2, ... , yn]]
         */
 
-        // add time and value
-        if(time == "") time = Math.floor(new Date() / 1000);
-        else time = Math.floor(new Date(time) / 1000);
-
-        this.history.push(value);
-        this.history_t.push(time);
-
-        // remove old times
-        let t0 = this.params.t0 == "" ?  Math.floor(new Date() / 1000) :  Math.floor(new Date(this.params.t0 / 1000));
-        for (var i = this.history_t.length -1; i > 0; i--) {
-            if(t0 - this.history_t[i] > this.params.history_length) break;
+        let params_ = {
+            name: "",
+            color: Subtle.COLORS["primary"][this.traces.length],
+            show_markers: false,
+            show_lines: true,
+            plot_area: false, // fill area below the graph
+            plot_manhattan: false, // make line manhattan
+            plot_spline: false, // make line a spline
+            line_stroke: 2,
+            marker_symbol: "circle",
+            marker_size: 6,
+            zindex: 0,
         }
 
-        this.history.splice(0, i);
-        this.history_t.splice(0, i);
+        for(const p in parameters){ params_[p] = parameters[p]; };
 
+        let line_shape = "linear";
+        if(params_.plot_manhattan) line_shape = "hv";
+        if(params_.plot_spline) line_shape = "spline";
 
-        //
-        this.draw();
+        let mode = "lines+markers";
+        if(params_.show_lines && !params_.show_markers) mode = "lines";
+        if(!params_.show_lines && params_.show_markers) mode = "markers";
+        if(!params_.show_lines && !params_.show_markers) return;
 
+        this.traces.push({
+            type: 'scatter',
+            x: data[0],
+            y: data[1],
+            mode: mode,
+            fill: params_.plot_area ? "tozeroy" : "none",
+            name: params_.name,
+
+            marker: {
+                color: params_.color,
+                symbol: params_.marker_symbol,
+                size: params_.marker_size,
+            },
+            line: {
+                color: params_.color,
+                shape: line_shape,
+                width: params_.line_stroke,
+            },
+            zindex: params_.zindex,
+        });
+
+        return;
     }
 
+    add_columnchart(data, parameters){
+        /*
+            data = [ [x0, x1, x2, x3, ... , xn], [y0, y1, y2, y3, ... , yn] ]
+        */
+
+        let params_ = {
+            name: "",
+            color: Subtle.COLOR_PALETTES["main"][this.traces.length],
+            zindex: 0,
+        }
+
+        for(const p in parameters){ params_[p] = parameters[p]; };
+
+        this.traces.push({
+            type: 'bar',
+            x: data[0],
+            y: data[1],
+            name: params_.name,
+            marker: { color: params_.color },
+            zindex: params_.zindex,
+        });
+
+        return;
+    }
+
+    add_piechart(data, parameters){
+        /*
+            data = [ [label0, label1, label2, label3, ... , labeln], [y0, y1, y2, y3, ... , yn] ]
+        */
+
+        let params_ = {
+            name: "",
+            colors: Subtle.COLOR_PALETTES["main"],
+            donut: false,
+            show_labels: true,
+            zindex: 0,
+        }
+
+        for(const p in parameters){ params_[p] = parameters[p]; };
+
+        this.traces.push({
+            name: params_.name,
+            type: 'pie',
+            values: data[1],
+            labels: data[0],
+            hole: params_.donut ? 0.4 : 0,
+            textinfo: params_.show_labels ? 'label+percent' : 'percent',
+
+            marker: {
+                colors: params_.colors,
+            },
+            domain: {
+                row: 0,
+                column: this.pie_chart_index,
+            },
+
+            zindex: params_.zindex,
+        });
+
+        this.pie_chart_index += 1;
+        this.layout.grid = {rows: 1, columns: this.pie_chart_index}
+
+        return;
+    }
+
+    /*add_gantt(data, parameters){
+
+            //data = [ [t0, t1, y0], [t1, t2, y1], [t5, t6, y5], ... ]
+
+
+        let params_ = {
+            name: "",
+            colors: Subtle.COLORS["primary"],
+            color_by_values: false,
+            show_value: true,
+            width: 20,
+            zindex: 0,
+        }
+
+        for(const p in parameters){ params_[p] = parameters[p]; };
+
+        for(const s in data){
+
+            let line_color = params_.colors;
+            if(typeof params_.colors !== "string"){
+                if(params.color_by_values){
+                    let v = data[s][2]
+                    line_color = params_.colors[v];
+                } else {
+                    line_color = params_.colors[s];
+                }
+            }
+
+            this.traces.push({
+                type: 'scatter',
+                mode: 'lines',
+                x: [ data[s][0] , data[s][1] ],
+                y: [ params_.name , params_.name ],
+                line: { color: line_color, width: params_.width },
+                zindex: params_.zindex,
+            });
+        }
+
+        return;
+    }*/
+
+    add_boxandwhiskers(data, parameters){
+        /*
+            data = [ y0, y1, y2, y3, y4, y5, y6, ... ]
+        */
+
+        let params_ = {
+            name: "",
+            color: Subtle.COLORS["primary"],
+            show_outliers: true,
+            show_mean: true,
+            zindex: 0,
+        }
+
+        for(const p in parameters){ params_[p] = parameters[p]; };
+
+        this.traces.push({
+            type: 'box',
+            y: data,
+            x: params_.name,
+            name: params_.name,
+            boxpoints: params_.show_outliers ? 'Outliers' : false,
+            boxmean: params_.show_mean,
+
+            marker: {
+                color: params_.color,
+            },
+            zindex: params_.zindex,
+        });
+
+        return;
+    }
+
+    add_heatmap(data, parameters){
+        /*
+            data = [
+                [A1, B1, C1, D1, E1],
+                [A2, B2, C2, D2, E2],
+                [A3, B3, C3, D3, E3],
+                [A4, B4, C4, D4, E4],
+            ]
+        */
+
+        let params_ = {
+            x: [],
+            y: [],
+            colors: Subtle.COLORS["primary"],
+            show_scale : true,
+            zindex: 0,
+        }
+
+        for(const p in parameters){ params_[p] = parameters[p]; };
+
+        let colorscale = params_.colors;
+        if(typeof params_.colors == "string"){
+            colorscale = [[0, "#fff"], [1, params_.colors]];
+        }
+
+        this.traces.push({
+            type: 'heatmap',
+            z: data,
+            x: params_.x,
+            y: params_.y,
+
+            colorscale: colorscale,
+            showscale: params_.show_scale,
+            zindex: params_.zindex,
+        });
+
+        return;
+    }
+
+    add_histogram(data, parameters){
+        /*
+            data = [ y0, y1, y2, y3, y4, y5, y6, ... ]
+        */
+
+        let params_ = {
+            nbins : 0,
+            zindex: 0,
+            color: Subtle.COLORS["primary"],
+        }
+
+        for(const p in parameters){ params_[p] = parameters[p]; };
+
+        this.traces.push({
+            type: 'histogram',
+            x: data,
+            nbinsx: params_.nbins,
+            marker: {
+                color: params_.color
+            },
+            zindex: params_.zindex,
+        });
+
+        return;
     }
 }
+
+
+//soundalarm.js
+Subtle.SoundAlarm = class SoundAlarm{
+  constructor(file, parameters){
+    this.params = {
+      loop: true,
+    }
+    for(const p in parameters){ this.params[p] = parameters[p]; }
+
+    this.file = file;
+    this.audio = new Audio(file);
+
+    this.is_playing = false;
+  }
+
+  play(){
+    if(!this.is_playing){
+      this.audio.play();
+      this.is_playing = true;
+    }
+  }
+
+  stop(){
+    audio.stop();
+    if(this.is_playing){
+      this.audio.stop();
+      this.is_playing = true;
+    }
+  }
+
+}
+
+
+//colors.js
+// =============================================================================
+// SET COLOR MODE
+// =============================================================================
+Subtle.COLOR_MODE = "light";
+
+Subtle.SET_COLOR_MODE = function(mode = "dark"){
+  Subtle.COLOR_MODE = mode;
+  if(mode == "dark") Subtle.COLORS = Subtle.DARK_MODE;
+  else if(mode == "light") Subtle.COLORS = Subtle.LIGHT_MODE;
+
+  document.getElementsByTagName("body")[0].style.backgroundColor = Subtle.COLORS["background"];
+  document.getElementsByTagName("body")[0].style.color = Subtle.COLORS["text"];
+}
+
+Subtle.SET_COLOR = function(color, key = "primary"){
+  Subtle.LIGHT_MODE[key] = color;
+  Subtle.DARK_MODE[key] = color;
+
+  if(key == "primary"){
+    for(const p in Subtle.COLOR_PALETTES){
+      
+    }
+  }
+
+  if(key=="primary") Subtle.INSERT_COLOR_IN_COLOR_PALETTES(color);
+}
+
+Subtle.INSERT_COLOR_IN_COLOR_PALETTES = function(color){
+  for(const p in Subtle.COLOR_PALETTES){
+    Subtle.COLOR_PALETTES[p].splice(0,0,color);
+  }
+}
+
+Subtle.GET_COLOR = function(color){
+  if(color in Subtle.COLORS) { return Subtle.COLORS[color] }
+  return color;
+}
+
+// =============================================================================
+// MAIN COLORS
+// =============================================================================
+Subtle.LIGHT_MODE = {};
+Subtle.DARK_MODE = {};
+
+Subtle.COLORS = Subtle.LIGHT_MODE;
+
+// =============================================================================
+// LIGHT MODE
+// =============================================================================
+
+Subtle.LIGHT_MODE["primary"] = "#5bbadc";
+Subtle.LIGHT_MODE["background"] = "#FFFFFF";
+Subtle.LIGHT_MODE["text"] = "#000000";
+Subtle.LIGHT_MODE["contrast"] = "#FFFFFF";
+
+Subtle.LIGHT_MODE["control"] = "#555555";
+Subtle.LIGHT_MODE["inactive"] = "#808080";
+Subtle.LIGHT_MODE["ok"] = "#73d216";
+Subtle.LIGHT_MODE["error"] = "#dc0000";
+Subtle.LIGHT_MODE["info"] = "#0088e8";
+Subtle.LIGHT_MODE["warning"] = "#fbb901";
+Subtle.LIGHT_MODE["inactive"] = "#aea79f";
+
+// =============================================================================
+// DARK MODE
+// =============================================================================
+Subtle.DARK_MODE["primary"] = "#0086b3";
+Subtle.DARK_MODE["background"] = "#121212";
+Subtle.DARK_MODE["text"] = "#FFFFFF";
+Subtle.DARK_MODE["contrast"] = "#FFFFFF";
+
+Subtle.DARK_MODE["control"] = "#A5A5A5";
+Subtle.DARK_MODE["inactive"] = "#808080";
+Subtle.DARK_MODE["ok"] = "#73d216";
+Subtle.DARK_MODE["error"] = "#ff2424";
+Subtle.DARK_MODE["info"] = "#0088e8";
+Subtle.DARK_MODE["warning"] = "#fbb901";
+Subtle.DARK_MODE["inactive"] = "#aea79f";
+
+// =============================================================================
+// COLOR PALETTES
+// =============================================================================
+Subtle.COLOR_PALETTES = {};
+
+Subtle.COLOR_PALETTES["main"] = [
+  "#5bbadc",
+  "#3d5afe",
+  "#00e676",
+  "#76ff03",
+  "#c6ff00",
+  "#ffc400",
+  "#ff3d00",
+  "#f50057",
+  "#d500f9",
+  "#1de9b6",
+];
+
+Subtle.COLOR_PALETTES["alternative"] = [
+  "#d90d39",
+  "#f8432d",
+  "#ff8e25",
+  "#ef55f1",
+  "#c543fa",
+  "#6324f5",
+  "#2e21ea",
+  "#3d719a",
+  "#31ac28",
+  "#96d310",
+];
+
+Subtle.COLOR_PALETTES["creamy"] = [
+  "#ea989d",
+  "#b9d7f7",
+  "#c6bcdd",
+  "#9bfdce",
+  "#bee8bb",
+  "#f9f2c0",
+  "#5f8c96",
+  "#9b91ac",
+  "#ae896f",
+  "#cc6d55",
+];
+
+Subtle.COLOR_PALETTES["contrast"] = [
+  "#8ae234",
+  "#fcaf3e",
+  "#729fcf",
+  "#ad7fa8",
+  "#ef2929",
+  "#4e9a06",
+  "#ce5c00",
+  "#204a87",
+  "#5c3566",
+  "#a40000",
+];
+
+Subtle.COLOR_PALETTES["soft"] = [
+  "#ef9a9a",
+  "#ce93d8",
+  "#b39ddb",
+  "#90caf9",
+  "#80cbc4",
+  "#a5d6a7",
+  "#ffe082",
+  "#ffcc80",
+  "#ffab91",
+  "#b0bec5",
+];
+
+Subtle.COLOR_PALETTES["accent"] = [
+  "#d50000",
+  "#c51162",
+  "#6200ea",
+  "#2962ff",
+  "#00bfa5",
+  "#00c853",
+  "#ffab00",
+  "#ff6b00",
+  "#dd2c00",
+  "#263238",
+];
 
 
 //gantt.js
@@ -1138,822 +768,81 @@ Subtle.GanttChart = class GanttChart{
 }
 
 
-//time_plot.js
-Subtle.TimePlot = class TimePlot {
+//gauge_advanced.js
+Subtle.GaugeHistoric = class GaugeHistoric {
 
-  /*
-	The Graph Control displays a plot with time on the x axis and a given value
-	on the y axis. The plot refreshes itself when the update_value is called.
-
-  y = y_max ^
-            |                               ----
-            |       ----                  /      \
-            |     /      \         ------         \
-            |    /        \      /                 \
-            |---            ----                     ------
-            |
-  y = y_min |_____________________________________________>
-  		  t = time_span								                    t = 0
-
-  */
-
-  constructor(object, parameters = {}){
+    constructor(object, parameters){
 
     // =========================================================================
-		// PARAMETERES
-		// =========================================================================
+    // PARAMETERES
+    // =========================================================================
     this.params = {
-      y_min : -0.25,
-      y_max : 1.25,
-      time_span : 10, // time span in seconds
-      units : "",
-      color : Subtle.COLORS["primary"],
-
-      limit_high : NaN, // upper limit for y (draws a dashed line)
-      limit_low : NaN, // lower limit for y (draws a dashed line)
-      y_auto : false, // calculate automatically y_min and y_max
-      shade_limits : false, // display limits as a shade
-
-      stroke_width : 3,
-      show_labels : false,
-
-      left_offset : 0,
-      value_on_left : false, // instead of text shows the value on left
-      override_text_left : "", // display some text on the left (other than te value)
-
-      endpoint : false, // draw a circle on the end
-      right_offset : 3, // offset on the right for endpoint
-      fade : false, // fade for big t
-      glow : false, // make the line glow
-      fill_area: false,
-
-      smooth : false, // smooths out the plot by auto updating
-      t0: "", // t0
+        inner_padding : 3,
+        history_length: 3600,
+        t0: "",
     };
 
     for(const p in parameters){ this.params[p] = parameters[p]; };
 
     // =========================================================================
-		// OTHER
-		// =========================================================================
+    // OTHER
+    // =========================================================================
     this.object = (typeof object === "string" ? document.getElementById(object) : object);
 
-    this.data = [];
-    this.times = [];
-    this.averaging_buffer = [];
-
-    // save max and min value
-    this.max_value = 0.5 * (this.params.y_max - this.params.y_min);
-		this.min_value = 0.5 * (this.params.y_max - this.params.y_min);
-
-    // Define styles to use in auxiliary lines and text
-    this.line_style = { stroke_color: "#000000", stroke_width: 3, }
-    this.line_limit_style = { stroke_color: "#888888", stroke_width: 1, stroke_dasharray: 4, }
-    this.text_limit_style = { color: "#888888", anchor: "left", font_size:'16px' };
-    this.labels_style = { anchor: "left", font_size:'16px' };
-
-
-    // =========================================================================
-		// USEFUL FUNCTIONS
-		// =========================================================================
-
-    // scaling helper functions
-		// t (or x) is time, measured from right to left (right edge -> t = 0, left edge -> t = time_span)
-		// y is value, measured from bottom to top (bottom edge -> y = y_min, top edge -> y = y_max)
-		//this.transform_y = function(y){ return (height - this.offset_y) - y * (height - this.offset_y) / (this.y_max - this.y_min); }
-		this.transform_y = function(y){ return (this.params.y_max - y) * (this.object.offsetHeight) / (this.params.y_max - this.params.y_min); }
-		this.transform_t = function(t){ return (this.object.offsetWidth - this.params.stroke_width - this.params.right_offset) - t * (this.object.offsetWidth - this.params.left_offset) / this.params.time_span; }
-
-    this.draw_line = function(t1,y1,t2,y2,style){
-			y1 = this.transform_y(y1);
-			y2 = this.transform_y(y2);
-			t1 = this.transform_t(t1);
-			t2 = this.transform_t(t2);
-			return Subtle.svg_line(t1,y1,t2,y2,style);
-		}
-
-    this.draw_circle = function(t,y,r,style){
-			t = this.transform_t(t);
-			y = this.transform_y(y);
-			return Subtle.svg_circle(t,y,r,style);
-		}
-
-    // 8) autoupdate
-    if(this.params.smooth){
-      let parent = this;
-      window.setInterval(function(){
-        parent.update(parent.current_value);
-      }, 50);
-    }
-
-    // =========================================================================
-		// DRAW CONTROL
-		// =========================================================================
-
-    // returns the svg code for the main plot
-    this.draw_get_main_svg = function(width, height){
-      var plt_ = "";
-
-      // 0) draw plot
-      // ============
-      let color = (this.params.color in Subtle.COLORS ? Subtle.COLORS[this.params.color] : this.params.color);
-      let plot_style = { stroke_color: color, stroke_width: this.params.stroke_width, stroke_linecap: "round" };
-      let glow_style = { stroke_color: color, stroke_width: this.params.stroke_width+1, stroke_linecap: "round" };
-
-      // update styles for fading
-      if(this.params.fade){
-        let fade_grad  = Subtle.svg_lineargradient(this.object.id + 'fade_gradient', this.params.color, 'h');
-        plt_ += fade_grad;
-        plot_style.stroke_color = "url(#" + this.object.id + "fade_gradient)";
-        glow_style.stroke_color = "url(#" + this.object.id + "fade_gradient)";
-      }
-
-      // calculate path
-      var i = this.times.length - 1;
-
-      if(typeof this.data[i] !== "undefined"){
-
-        let t0 = this.params.t0 == "" ?  new Date() :  new Date(this.params.t0);
-        let time_i = (t0 - this.times[i])/1000;
-
-        let path = '<path d=" M ' + this.transform_t(time_i) + ' ' + this.transform_y(this.data[i]) + ' ';
-        i--;
-
-        time_i = (t0 - this.times[i])/1000;
-
-        while(i >= 0 && time_i < this.params.time_span && typeof this.data[i] !== "undefined"){
-          time_i = (t0 - this.times[i])/1000;
-          path += 'L ' + this.transform_t(time_i) + ' ' + this.transform_y(this.data[i]) + ' ';
-          i--;
-        }
-
-        // add path to plt
-        plt_ += path + '" ' + Subtle.svg_style(plot_style) + ' />';
-        if(this.params.glow){ plt_ += path + '" ' + Subtle.svg_style(glow_style) + ' filter="url(#blur_filter)"/>'; }
-
-        // trim data and time arrays to keep the size constant
-        if(i > 0){
-          this.times.splice(0,i);
-          this.data.splice(0,i);
-        }
-      }
-
-      // draw endpoint
-      // ================
-      if (this.params.endpoint && typeof this.data[this.data.length-1] !== "undefined"){
-        let endpoint_style = { fill_color: this.params.color, stroke_width : 0 };
-        plt_ += this.draw_circle(0,this.data[this.data.length-1],this.params.stroke_width+3,endpoint_style);
-      }
-
-      return plt_;
-
-    }
-
-    // returns the svg code for labels, guides, etc.
-    this.draw_get_context_svg = function(width, height){
-      var svg_ = "";
-
-      // display value on left for sparkline
-      if(this.params.value_on_left & this.params.override_text_left == ""){
-        svg_ += Subtle.svg_text(1, height * 0.5, Subtle.ROUND(this.data[this.data.length-1]) + this.params.units, {center_vertically: true });
-      }
-      if(this.params.override_text_left != ""){
-        svg_ += Subtle.svg_text(1, height * 0.5, this.params.override_text_left, {center_vertically: true });
-      }
-
-      // 1) draw guides and limits
-      // =========================
-      this.line_limit_style.stroke_color = Subtle.COLORS["control"];
-      this.text_limit_style.color = Subtle.COLORS["control"];
-
-      if(this.params.shade_limits){
-        // shaded limits
-        let x0 = this.params.left_offset;
-        let y0 = this.transform_y(this.params.limit_high);
-        let x1 = width;
-        let y1 = this.transform_y(this.params.limit_low);
-        svg_ += Subtle.svg_rectangle(x0,y0,x1-x0,y1-y0,{fill_color: Subtle.COLORS["control"], stroke_width:0});
-
-      } else {
-        // normal limits
-        if(!Number.isNaN(this.params.limit_high)){
-          // draw line and text of top limit
-          svg_ += this.draw_line(this.params.time_span,this.params.limit_high,0,this.params.limit_high, this.line_limit_style);
-          svg_ += Subtle.svg_text(5 + this.params.left_offset,this.transform_y(this.params.limit_high) + 16,this.params.limit_high + this.params.units, this.text_limit_style);
-        }
-        if(!Number.isNaN(this.params.limit_low)){
-          // draw line and text of bottom limit
-          svg_ += this.draw_line(this.params.time_span,this.params.limit_low,0,this.params.limit_low, this.line_limit_style);
-          svg_ += Subtle.svg_text(5 + this.params.left_offset,this.transform_y(this.params.limit_low) - 5,this.params.limit_low + this.params.units, this.text_limit_style);
-        }
-      }
-
-
-      // 3) draw x label
-      // ===============
-      if(this.params.show_labels){
-        this.labels_style.anchor = "middle";
-        svg_ += Subtle.svg_text((width - this.params.left_offset) *0.5 + this.params.left_offset,(height - 6),"- " + this.params.time_span + "s -",this.labels_style);
-      }
-
-      // 4) draw y labels
-      // ================
-      if(this.params.show_labels){
-        this.labels_style.anchor = "left";
-        svg_ += Subtle.svg_text(this.params.left_offset+5,height-6,Subtle.ROUND(this.params.y_min) + this.params.units,this.labels_style);
-        svg_ += Subtle.svg_text(this.params.left_offset+5,18,Subtle.ROUND(this.params.y_max) + this.params.units,this.labels_style);
-      }
-
-      return svg_;
-
-    }
-
-    this.draw = function(){
-      let height = this.object.offsetHeight;
-      let width = this.object.offsetWidth;
-
-      let plt_ = this.draw_get_main_svg(width, height);
-      let svg_ = this.draw_get_context_svg(width, height);
-
-      // draw everything to control
-      let content = Subtle.svg_markup(width, height, plt_ + svg_);
-      //if(content.includes("NaN")) return;
-      this.object.innerHTML = content;
-
-    }
-
-    // =========================================================================
-		// UPDATE
-		// =========================================================================
-    this.update = function(value, time = "", draw_after_update = true){
-
-      // calculate elapsed time from the last time this function was called in seconds
-      if(time == "") time = new Date();
-      else time = new Date(time);
-      this.times.push(time);
-
-      // update data queue (push new value)
-      this.data.push(value);
-      this.current_value = value;
-
-      // clear min and max
-      // save if min or max
-      if( this.params.y_auto ){
-        if (this.max_value < value) {
-          this.max_value = value;
-          this.params.y_max = this.max_value + (this.max_value - this.min_value) * 0.25;
-        };
-        if (this.min_value > value) {
-          this.min_value = value;
-          this.params.y_min = this.min_value - (this.max_value - this.min_value) * 0.25;
-        };
-      }
-
-      if(draw_after_update) { this.draw(); }
-
-    }
-  }
-}
-
-
-//gauge.js
-Subtle.Gauge = class Gauge {
-
-  constructor(object, parameters){
-
-    // =========================================================================
-		// PARAMETERES
-		// =========================================================================
-    this.params = {
-      max_val : 1,
-      min_val : 0,
-      units : "",
-      stroke_width : 10,
-      color : "primary",
-      background_color : "control",
-      hand_color : "control",
-      inner_padding : 0,
-
-      show_label : true,
-      show_hand : true,
-      linecap: "round",
-      opening_angle: 0.5,
-
-      override_label : "",
-
-      dial_offset : 0,
-      background_fill : "",
-      font_size: 36,
-      rounding : 2,
-
-      //
-      limit_low : NaN,
-      limit_high : NaN,
-    };
-
-    for(const p in parameters){ this.params[p] = parameters[p]; };
-
-    // =========================================================================
-		// OTHER
-		// =========================================================================
-    this.object = (typeof object === "string" ? document.getElementById(object) : object);
+    this.gauge = new Subtle.Gauge(this.object, this.params);
 
     this.current_value = (this.params.max_val + this.params.min_val) * 0.5;
 
-    // use this for advanced dial
-    this.forced_min_value = NaN;
-    this.forced_max_value = NaN;
+    this.history = [];
+    this.history_t = [];
 
-		// ===============================================================================
-		// DRAW CONTROL
-		// ===============================================================================
-
-		this.draw = function(){
-      let params_color = this.params.color in Subtle.COLORS ? Subtle.COLORS[this.params.color] : this.params.color;
-      let params_background_color = this.params.background_color in Subtle.COLORS ? Subtle.COLORS[this.params.background_color] : this.params.background_color;
-      let params_hand_color = this.params.hand_color in Subtle.COLORS ? Subtle.COLORS[this.params.hand_color] : this.params.hand_color;
-
-      var height = this.object.offsetHeight;
-      var width = this.object.offsetWidth;
-
-			let svg_ = '';
-      const pi = Math.PI;
-
-			// 1) draw control
-			// ===============
-			let cx = width * 0.5;
-			let cy = height * 0.5;
-			let ry = (width > height ? (height * 0.5) : (width * 0.5)) - this.params.stroke_width;
-			let rx = ry;
-      //let s = (this.params.opening_angle > 28.6478 ? 28.6478 : this.params.opening_angle) * pi / 180;
-      let s = (this.params.opening_angle == 1 ? 0.99999 : this.params.opening_angle) * 0.5;
-      let t1 = pi * (1 - s);
-			let delt1 = 3*pi - 2*t1;
-      let delt2 = (3*pi - 2*t1) * (this.current_value - this.params.min_val) / (this.params.max_val - this.params.min_val);
-      let phi = 0;
-
-      // angles for limits
-      let delt_low = (!Number.isNaN(this.params.limit_low)) ? ((3*pi - 2*t1) * (this.params.limit_low - this.params.min_val) / (this.params.max_val - this.params.min_val) + t1) : t1;
-      let delt_high= (!Number.isNaN(this.params.limit_high)) ? ((3*pi - 2*t1) * (this.params.limit_high - this.params.min_val) / (this.params.max_val - this.params.min_val) + t1) : delt1+t1;
-
-      t1 = t1 + this.params.dial_offset;
-
-      // styles for background and main arc
-      let style_bg = { stroke_color: params_background_color, stroke_width : this.params.stroke_width, stroke_linecap: this.params.linecap }
-      let style_mn = { stroke_color: params_color, stroke_width : this.params.stroke_width-this.params.inner_padding*2, stroke_linecap: this.params.linecap }
-      // styles for limits
-      let shade_color = Subtle.COLOR_MODE == "dark" ? "#EDEDED" : "#959595";
-      let style_l0 = { stroke_color: shade_color, stroke_width : this.params.stroke_width, stroke_linecap: "butt" }
-      let style_l1 = { stroke_color: shade_color, stroke_width : this.params.stroke_width, stroke_linecap: "round" }
-
-      // circle background
-      if(this.params.background_fill != ""){
-        svg_ += Subtle.svg_ellipsearc(cx,cy,rx-this.params.stroke_width*0.7,ry-this.params.stroke_width*0.7,t1,delt1,phi,{fill_color:this.params.background_fill, stroke_width:0 });
-      }
-
-      // background arc
-      svg_ += Subtle.svg_ellipsearc(cx,cy,rx,ry,t1,delt1,phi,style_bg);
-
-      // limits
-      if(this.params.dial_offset == 0){
-        if(!Number.isNaN(this.params.limit_low) && !Number.isNaN(this.params.limit_high)){
-          svg_ += Subtle.svg_ellipsearc(cx,cy,rx,ry,delt_low,delt_high-delt_low,phi,style_l0);
-        }
-        else if(!Number.isNaN(this.params.limit_high)){
-          svg_ += Subtle.svg_ellipsearc(cx,cy,rx,ry,delt_low,delt_high-delt_low,phi,style_l0);
-          svg_ += Subtle.svg_ellipsearc(cx,cy,rx,ry,delt_low,(delt_high-delt_low)*0.5,phi,style_l1);
-        }
-        else if(!Number.isNaN(this.params.limit_low)){
-          svg_ += Subtle.svg_ellipsearc(cx,cy,rx,ry,delt_low,delt_high-delt_low,phi,style_l0);
-          svg_ += Subtle.svg_ellipsearc(cx,cy,rx,ry,delt_low+(delt_high-delt_low)*0.5,(delt_high-delt_low)*0.5,phi,style_l1);
-        }
-      }
-
-      // main arc
-      if(!Number.isNaN(this.forced_min_value) && !Number.isNaN(this.forced_max_value)){
-        let forced_min = (3*pi - 2*t1) * (this.forced_min_value - this.params.min_val) / (this.params.max_val - this.params.min_val);
-        let forced_max = (3*pi - 2*t1) * (this.forced_max_value- this.params.min_val) / (this.params.max_val - this.params.min_val);
-        svg_ += Subtle.svg_ellipsearc(cx,cy,rx,ry,t1+forced_min,forced_max-forced_min,phi,style_mn);
-      } else {
-        svg_ += Subtle.svg_ellipsearc(cx,cy,rx,ry,t1,delt2,phi,style_mn);
-      }
-
-
-			// 2) draw value inside
-			// ====================
-      if(this.params.show_label)
-      {
-        // get style
-        let text_style = { center_vertically: true, anchor: 'middle' };
-        if(this.params.font_size > 0) text_style.font_size = this.params.font_size + "px";
-        let unit_style = {center_vertically: true, color: "gray",anchor: 'middle', font_size: "24px"};
-
-        // set label text to value+units or overriden label text
-        let label = Subtle.ROUND(this.current_value, this.params.rounding);
-        if(this.params.override_label != "") { label = this.params.override_label }
-
-        // if hand is visible, display text on bottom, else display on center
-        if(this.params.show_hand){
-          svg_ += Subtle.svg_text(cx, cy+rx*0.9, label, text_style);
-        }else{
-
-          if(this.params.units != ""){
-            svg_ += Subtle.svg_text(cx, cy - 10, label, text_style);
-            svg_ += Subtle.svg_text(cx, cy + 20, this.params.units, unit_style )
-          } else {
-            svg_ += Subtle.svg_text(cx, cy, label, text_style);
-          }
-
-        }
-
-      }
-
-      // 3) draw hand
-			// ============
-      if(this.params.show_hand){
-        svg_ += Subtle.svg_dial_hand(cx, cy, rx, (delt2-0.5*delt1)*180/pi, params_hand_color);
-      }
-
-
-			// return
-			this.object.innerHTML = Subtle.svg_markup(width, height, svg_);
-		}
-
-    this.update = function(value){
-      this.current_value = value;
-      if(value > this.params.max_val) this.current_value = this.params.max_val;
-  		if(value < this.params.min_val) this.current_value = this.params.min_val;
-  		this.draw();
-    }
-
-	}
-}
-
-
-//web_plot.js
-Subtle.WebPlot = class WebPlot{
-
-  constructor(object, parameters){
-
-    this.params = {
-      labels : ["A","B","C","D","E","F"],
-      max_value : 1,
-      min_value : 0,
-
-      limit_high : NaN,
-      limit_low : NaN,
-
-      show_grid : true,
-      show_tooltips : true,
-
-      endpoint_size : 5,
-      padding : 50,
-
-      color : "primary",
-      opacity : 0.5,
-    };
-
-    for(const p in parameters){ this.params[p] = parameters[p]; };
-
-    // =========================================================================
-    // OTHER
-    // =========================================================================
-    this.object = (typeof object === "string" ? document.getElementById(object) : object);
-    this.values = [0,0,0,0,0,0];
-
-
-    // =========================================================================
-		// USEFUL FUNCTIONS
-		// =========================================================================
-    // transform_val: receives a value r and a position p and returns the
-    // coordinates (x,y) of the point in the svg canvas
-
-    this.transform_val = function(r, p){
-      let R = this.params.max_value - this.params.min_value;
-      let H = this.object.offsetHeight;
-      let W = this.object.offsetWidth;
-
-      r = (r / R) * (((H > W ? W : H) - this.params.padding) * 0.5);
-
-      let alpha = 2 * Math.PI * p / this.params.labels.length;
-      let x = 0.5*W + r * Math.sin(alpha);
-      let y = 0.5*H - r * Math.cos(alpha);
-
-      return [x,y,r];
-    }
-
-
-    // =========================================================================
+    // ===============================================================================
     // DRAW CONTROL
-    // =========================================================================
-    this.draw = function(){
-      let params_color = this.params.color in Subtle.COLORS ? Subtle.COLORS[this.params.color] : this.params.color;
-
-      let height = this.object.offsetHeight;
-      let width = this.object.offsetWidth;
-
-      let svg_ = "";
-
-      // get center
-      let x_c = width * 0.5;
-      let y_c = height * 0.5;
-
-
-
-      // 1) Draw limits
-      // ==============
-
-      if(!Number.isNaN(this.params.limit_high)){
-        let r = this.transform_val(this.params.limit_high, 0)[2];
-        svg_ += Subtle.svg_circle(x_c, y_c, r, {stroke_width: 1, stroke_color: Subtle.COLORS["control"]})
-      }
-      if(!Number.isNaN(this.params.limit_low)){
-        let r = this.transform_val(this.params.limit_low, 0)[2];
-        svg_ += Subtle.svg_circle(x_c, y_c, r, {stroke_width: 1, stroke_color: Subtle.COLORS["control"]})
-      }
-
-
-      // 2) Draw grid (spikes)
-      // =====================
-      if(this.params.show_grid){
-
-        let line_style = {stroke_color: Subtle.COLORS["control"]};
-        for(let i = 0; i < this.params.labels.length; i++){
-          let s_ = this.transform_val(this.params.max_value*1,i);
-          svg_ += Subtle.svg_line(x_c,y_c,s_[0],s_[1],line_style);
-
-          if(this.params.endpoint_size > 0){
-            let tooltip_id = 'custom_label_for_' + this.object.id + '_id_' + this.params.labels[i];
-            svg_ += '<g id="' + tooltip_id + '">' + Subtle.svg_circle(s_[0],s_[1],this.params.endpoint_size,{fill_color: Subtle.COLORS["control"], stroke_width: 0}) + '</g>';
-          }
-
-
-        }
-      }
-
-
-      // 3) Draw values
-      // ==============
-      let plot_style = { stroke_color: params_color, stroke_linecap: "round", fill_color: params_color, opacity: this.params.opacity };
-
-      // first value
-      let s_ = this.transform_val(this.values[0],0);
-      let path = '<path d=" M ' + s_[0] + ' ' + s_[1] + ' ';
-
-      // other values
-      for(let i = 1; i < this.params.labels.length; i++){
-        let s_ = this.transform_val(this.values[i], i);
-
-        path += 'L ' + s_[0] + ' ' + s_[1] + ' ';
-
-      }
-
-      svg_ += path + ' Z" ' + Subtle.svg_style(plot_style) + ' />';
-
-
-      // 4) Draw control
-      // ===============
-      let content = Subtle.svg_markup(width, height, svg_);
-
-      this.object.innerHTML = content;
-
-      if(this.params.show_tooltips){
-        for(let i = 0; i < this.params.labels.length; i++){
-          let tooltip_id = 'custom_label_for_' + this.object.id + '_id_' + this.params.labels[i];
-          if(typeof tippy !== "undefined") tippy('#' + tooltip_id, {content:this.params.labels[i]})
-          else console.log("Tooltip error: tippy.js not included");
-        }
-      }
-
-    }
-
-    // =========================================================================
-    // UPDATE CONTROL
-    // =========================================================================
-    this.update = function(values, index = -1){
-
-      if(index < 0){
-        this.values = values;
-      }
-      else if(index < this.params.labels.length){
-        this.values[index] = values;
-      }
-
-      this.draw();
-
-    }
-  }
-
-}
-
-
-//logger.js
-Subtle.Logger = class Logger{
-
-  constructor(object, parameters){
-
-    this.params = {
-      show_stems : true,
-      show_timestamp : false,
-      max_length : 100,
-    };
-
-    for(const p in parameters){ this.params[p] = parameters[p]; };
-
-    // =========================================================================
-    // OTHER
-    // =========================================================================
-    this.object = (typeof object === "string" ? document.getElementById(object) : object);
-    this.object.style.overflowY = "scroll";
-
-    this.records = [];
-
-    // =========================================================================
-    // DRAW CONTROL
-    // =========================================================================
-    this.draw = function(){
-      let ctr_ = '<table class="logger">';
-
-      for(const r in this.records){
-
-        // define color
-        let color = this.records[r].color;
-        if(color in Subtle.COLORS) color = Subtle.COLORS[color];
-        let bg = 'background-color:' + color + ';';
-
-        // define icon
-        let ic = '<img src="' + this.records[r].icon + '" />';
-        if(["info","warning","error"].includes(this.records[r].icon)) ic = Subtle.svg_icon(this.records[r].icon, "#FFFFFF");
-
-        ctr_ += '<tr>';
-
-        ctr_ += '<td style="width:30px">';
-        ctr_ += '<div class="logger-item" style="' + bg + '"><div style="margin:2px">' + ic + '</div></div>';
-        ctr_ += '</td>';
-        ctr_ += '<td style="padding-left:10px">';
-        ctr_ += '<b>' + this.records[r].title + '</b>';
-        ctr_ += '</td>';
-
-        ctr_ += '</tr>';
-        ctr_ += '<tr>';
-
-        ctr_ += '<td style="width:30px">';
-
-        if(this.params.show_stems && r != this.records.length-1){
-          ctr_ += '<div class="logger-stem" style="background-color:' + Subtle.COLORS["control"] + '"></div>';
-        }
-
-        ctr_ += '</td>';
-
-        ctr_ += '<td style="padding-left:10px">';
-        ctr_ += '<div style="padding-bottom:15px; padding-top:2px; font-size:14px">' + this.records[r].text;
-        if(this.params.show_timestamp && this.records[r].timestamp != ""){
-          ctr_ += '<div style="padding-top:4px; font-size:12px">' + this.records[r].timestamp + '</div>';
-        }
-        ctr_ += '</div>';
-        ctr_ += '</td>';
-
-        ctr_ += '</tr>';
-
-      }
-
-      ctr_ += '</table>';
-      this.object.innerHTML = ctr_;
-    }
-
-    this.update = function(icon, title, text, timestamp = "", color = ""){
-      if(icon in Subtle.COLORS && color == ""){ color = Subtle.COLORS[icon]; }
-
-      this.records.splice(0, 0, {icon: icon, title: title, text: text, timestamp: timestamp, color:color });
-
-      while(this.records.length > this.params.max_length){ this.records.pop() }
-
-      this.draw()
-    }
-
-    this.clear = function(){
-      this.records = [];
-      this.draw();
-    }
-
-  }
-
-}
-
-
-//svg_view.js
-Subtle.SvgView = class SvgView{
-
-  constructor(object, parameters){
-
-    this.params = {
-      img : '',
-      onload : function(){},
-      stretch : true,
-      hover_effect : true,
-    };
-
-    for(const p in parameters){ this.params[p] = parameters[p]; };
-
-    // =========================================================================
-    // OTHER
-    // =========================================================================
-    this.object = (typeof object === "string" ? document.getElementById(object) : object);
-
-    // =========================================================================
-    // DRAW CONTROL
-    // =========================================================================
+    // ===============================================================================
     this.draw = function(){
 
-      var parent = this;
-      var xhttp = new XMLHttpRequest();
-      xhttp.onreadystatechange = function() {
-        if (this.readyState == 4 && this.status == 200) {
-          let data = this.responseText;
-          let ctr_ = '';
-          ctr_ += '<div class="svg_view_container' + (parent.params.stretch ? ' stretch' : '') + '">';
-          ctr_ += data;
-          ctr_ += '</div>';
-          parent.object.innerHTML = ctr_;
+        this.gauge.current_value = this.current_value;
 
-          parent.params.onload();
-        }
-      };
-      xhttp.open("GET", this.params.img, true);
-      xhttp.send();
+        let forced_min = Math.min( ...this.history );
+        let forced_max = Math.max( ...this.history );
+
+        if(forced_min < this.params.min_val) forced_min = this.params.min_val;
+        if(forced_max > this.params.max_val) forced_max = this.params.max_val;
+        this.gauge.forced_min_value = forced_min;
+        this.gauge.forced_max_value = forced_max;
+
+        this.gauge.draw();
+
     }
 
-    // =========================================================================
+    // ===============================================================================
     // UPDATE
-    // =========================================================================
-    this.set_child_color = function(item, color){
-      if(color in Subtle.COLORS) color = Subtle.COLORS[color];
-      document.getElementById(item).style.fill = color;
+    // ===============================================================================
+    this.update = function(value, time = ""){
+
+        this.current_value = value;
+
+        // add time and value
+        if(time == "") time = Math.floor(new Date() / 1000);
+        else time = Math.floor(new Date(time) / 1000);
+
+        this.history.push(value);
+        this.history_t.push(time);
+
+        // remove old times
+        let t0 = this.params.t0 == "" ?  Math.floor(new Date() / 1000) :  Math.floor(new Date(this.params.t0 / 1000));
+        for (var i = this.history_t.length -1; i > 0; i--) {
+            if(t0 - this.history_t[i] > this.params.history_length) break;
+        }
+
+        this.history.splice(0, i);
+        this.history_t.splice(0, i);
+
+        //
+        this.draw();
     }
 
-    this.set_child_text = function(item, text){
-      document.getElementById(item).innerHTML = text;
     }
-
-    this.set_child_onclick = function(item, onclick){
-      let it = document.getElementById(item);
-      it.onclick = onclick;
-
-      if(this.params.hover_effect){
-        it.style.cursor = "pointer";
-        it.onmouseover = function(){ it.style.opacity=0.75 };
-        it.onmouseout = function(){ it.style.opacity=1 };
-      }
-    }
-
-    this.set_child_bind = function(item, sub_item){
-      let it1 = document.getElementById(item);
-      let it2 = document.getElementById(sub_item);
-
-      it2.style.opacity = 0;
-
-      var hover_effect = this.params.hover_effect;
-      if(hover_effect) it1.style.cursor = "pointer";
-
-      it1.onmouseover = function(){ it2.style.opacity=1; if(hover_effect) it1.style.opacity = 0.75; };
-      it1.onmouseout  = function(){ it2.style.opacity=0; if(hover_effect) it1.style.opacity = 1; };
-    }
-
-    this.set_child_tooltip = function(item, tooltip){
-      let it = document.getElementById(item);
-
-      // add hover effect
-      if(this.params.hover_effect){
-        it.style.cursor = "pointer";
-        it.onmouseover = function(){ it.style.opacity=0.75 };
-        it.onmouseout = function(){ it.style.opacity=1 };
-      }
-
-      // add tippy tooltip
-      if(typeof tippy !== "undefined") tippy('#' + it.id, {content:tooltip, allowHTML: true})
-      else console.log("Tooltip error: tippy.js not included");
-    }
-
-    this.set_child_for_html = function(item){
-      let it = document.getElementById(item);
-      let bbox = it.getBBox();
-
-      let code = "";
-      code += '<foreignObject x="' + bbox.x + '" y="' + bbox.y + '" width="' + bbox.width + '" height="' + bbox.height + '">';
-      code += '<div style="height:100%; width:100%" id="' + item + '"></div>';
-      code += '</foreignObject>';
-
-      it.outerHTML = code;
-    }
-
-    // =========================================================================
-    // AUTO INITIALIZE
-    // =========================================================================
-    this.draw();
-
-  }
-
-
 }
 
 
@@ -2336,6 +1225,605 @@ Subtle.TreeView = class TreeView {
     this.draw();
 
     }
+}
+
+
+//tabs.js
+Subtle.TabsLayout = class TabsLayout {
+
+  constructor(object, tabs, parameters){
+
+    // =========================================================================
+		// PARAMETERES
+		// =========================================================================
+    this.params = {
+      show_labels : true,
+      show_labels_inline: false,
+      position : "center", // center, left, fill
+      color: Subtle.COLORS["primary"],
+      show_icons : true,
+      icon_size : 16,
+      dock_bottom: false,
+      direction: 'horizontal', // horizontal, vertical
+    };
+
+    for(const p in parameters){ this.params[p] = parameters[p]; };
+
+    // =========================================================================
+		// OTHER
+		// =========================================================================
+    this.object = (typeof object === "string" ? document.getElementById(object) : object);
+    this.tabs = tabs;
+
+		// ===============================================================================
+		// DRAW CONTROL
+		// ===============================================================================
+
+		this.draw = function(){
+
+      let jc = {"left":"flex-start", "fill":"space-evenly", "center":"center"}[this.params.position];
+
+      let prt_ = '<div style="display:flex; flex-direction:column; justify-content: ' + jc + '; height: 100%; width: 100%;">';
+      let str_ = '<div style="width:100%;">';
+
+      str_ += '<div class="tabs_layout_container" style="display: ' + (this.params.direction == "vertical" ? "block" : "flex") + '; direction:' +' align-content: stretch; justify-content: ' + jc + ';">';
+
+      let w = this.params.icon_size;
+      for(const t in tabs){
+        // create flex container
+        str_ += '<div id="tab_' + tabs[t].div + '" class="no-selectable tab-item" style="width:' + (this.params.show_labels_inline || this.params.direction == "vertical" ? 'auto' : w*2+10 + 'px' ) + '; flex-direction:' + (this.params.show_labels_inline ? 'row' : 'column') + '; ">';
+
+        // add icons
+        if(this.params.show_icons){
+          str_ += '<div style="font-size:' + w + 'px; height:' + w*1 + 'px; line-height:' + (w) + 'px">' + tabs[t].icon + '</div>';
+        }
+
+        // add labels
+        if(this.params.show_labels){
+          if(this.params.show_labels_inline){
+            str_ += '<div style="font-size:12px; padding-left:' + (this.params.show_icons ? '10' : '0') + 'px;">';
+          } else {
+            str_ += '<div style="font-size:12px; margin-top: 5px;">';
+          }
+          str_ += tabs[t].label + '</div>';
+        }
+
+        str_ += '</div>';
+
+        // hide all tab divs
+        let dv = document.getElementById(tabs[t].div);
+        dv.style.height = "100%";
+        dv.style.width = "100%";
+        dv.style.display = "none";
+      }
+
+      str_ += '</div>';
+      str_ += '</div>';
+
+
+      //
+      let inner_html = this.object.innerHTML;
+      let result = prt_ + str_ + inner_html + "</div>";
+      if(this.params.dock_bottom){
+        result = prt_ + inner_html + str_ + "<div>";
+      }
+			this.object.innerHTML = result;
+
+      // clicks
+      var parent = this;
+      for(const t in tabs){
+        this.object.getElementsByClassName("tabs_layout_container")[0].childNodes[t].onclick = function(){ parent.select_tab(t) };
+      }
+
+      this.select_tab(0);
+		}
+
+    this.select_tab = function(tabid){
+      var parent = this;
+      //
+      for(const s in parent.tabs){
+        document.getElementById(parent.tabs[s].div).style.display = "none";
+        parent.object.getElementsByClassName("tabs_layout_container")[0].childNodes[s].style.color = Subtle.COLORS["text"];
+      }
+      document.getElementById(parent.tabs[tabid].div).style.display = "block";
+      parent.object.getElementsByClassName("tabs_layout_container")[0].childNodes[tabid].style.color = Subtle.COLORS["primary"];
+
+      if(parent.tabs[tabid].onselect){
+        parent.tabs[tabid].onselect();
+      }
+
+    }
+
+    this.draw()
+
+
+
+	}
+}
+
+
+//time_plot.js
+Subtle.TimePlot = class TimePlot {
+
+  /*
+	The Graph Control displays a plot with time on the x axis and a given value
+	on the y axis. The plot refreshes itself when the update_value is called.
+
+  y = y_max ^
+            |                               ----
+            |       ----                  /      \
+            |     /      \         ------         \
+            |    /        \      /                 \
+            |---            ----                     ------
+            |
+  y = y_min |_____________________________________________>
+  		  t = time_span								                    t = 0
+
+  */
+
+  constructor(object, parameters = {}){
+
+    // =========================================================================
+		// PARAMETERES
+		// =========================================================================
+    this.params = {
+      y_min : -0.25,
+      y_max : 1.25,
+      time_span : 10, // time span in seconds
+      units : "",
+      color : Subtle.COLORS["primary"],
+
+      limit_high : NaN, // upper limit for y (draws a dashed line)
+      limit_low : NaN, // lower limit for y (draws a dashed line)
+      y_auto : false, // calculate automatically y_min and y_max
+      shade_limits : false, // display limits as a shade
+
+      stroke_width : 3,
+      show_labels : false,
+
+      left_offset : 0,
+      value_on_left : false, // instead of text shows the value on left
+      override_text_left : "", // display some text on the left (other than te value)
+
+      endpoint : false, // draw a circle on the end
+      right_offset : 3, // offset on the right for endpoint
+      fade : false, // fade for big t
+      glow : false, // make the line glow
+      fill_area: false,
+
+      smooth : false, // smooths out the plot by auto updating
+      t0: "", // t0
+    };
+
+    for(const p in parameters){ this.params[p] = parameters[p]; };
+
+    // =========================================================================
+		// OTHER
+		// =========================================================================
+    this.object = (typeof object === "string" ? document.getElementById(object) : object);
+
+    this.data = [];
+    this.times = [];
+    this.averaging_buffer = [];
+
+    // save max and min value
+    this.max_value = 0.5 * (this.params.y_max - this.params.y_min);
+		this.min_value = 0.5 * (this.params.y_max - this.params.y_min);
+
+    // Define styles to use in auxiliary lines and text
+    this.line_style = { stroke_color: "#000000", stroke_width: 3, }
+    this.line_limit_style = { stroke_color: "#888888", stroke_width: 1, stroke_dasharray: 4, }
+    this.text_limit_style = { color: "#888888", anchor: "left", font_size:'16px' };
+    this.labels_style = { anchor: "left", font_size:'16px' };
+
+
+    // =========================================================================
+		// USEFUL FUNCTIONS
+		// =========================================================================
+
+    // scaling helper functions
+		// t (or x) is time, measured from right to left (right edge -> t = 0, left edge -> t = time_span)
+		// y is value, measured from bottom to top (bottom edge -> y = y_min, top edge -> y = y_max)
+		//this.transform_y = function(y){ return (height - this.offset_y) - y * (height - this.offset_y) / (this.y_max - this.y_min); }
+		this.transform_y = function(y){ return (this.params.y_max - y) * (this.object.offsetHeight) / (this.params.y_max - this.params.y_min); }
+		this.transform_t = function(t){ return (this.object.offsetWidth - this.params.stroke_width - this.params.right_offset) - t * (this.object.offsetWidth - this.params.left_offset) / this.params.time_span; }
+
+    this.draw_line = function(t1,y1,t2,y2,style){
+			y1 = this.transform_y(y1);
+			y2 = this.transform_y(y2);
+			t1 = this.transform_t(t1);
+			t2 = this.transform_t(t2);
+			return Subtle.svg_line(t1,y1,t2,y2,style);
+		}
+
+    this.draw_circle = function(t,y,r,style){
+			t = this.transform_t(t);
+			y = this.transform_y(y);
+			return Subtle.svg_circle(t,y,r,style);
+		}
+
+    // 8) autoupdate
+    if(this.params.smooth){
+      let parent = this;
+      window.setInterval(function(){
+        parent.update(parent.current_value);
+      }, 50);
+    }
+
+    // =========================================================================
+		// DRAW CONTROL
+		// =========================================================================
+
+    // returns the svg code for the main plot
+    this.draw_get_main_svg = function(width, height){
+      var plt_ = "";
+
+      // 0) draw plot
+      // ============
+      let color = (this.params.color in Subtle.COLORS ? Subtle.COLORS[this.params.color] : this.params.color);
+      let plot_style = { stroke_color: color, stroke_width: this.params.stroke_width, stroke_linecap: "round" };
+      let glow_style = { stroke_color: color, stroke_width: this.params.stroke_width+1, stroke_linecap: "round" };
+
+      // update styles for fading
+      if(this.params.fade){
+        let fade_grad  = Subtle.svg_lineargradient(this.object.id + 'fade_gradient', this.params.color, 'h');
+        plt_ += fade_grad;
+        plot_style.stroke_color = "url(#" + this.object.id + "fade_gradient)";
+        glow_style.stroke_color = "url(#" + this.object.id + "fade_gradient)";
+      }
+
+      // calculate path
+      var i = this.times.length - 1;
+
+      if(typeof this.data[i] !== "undefined"){
+
+        let t0 = this.params.t0 == "" ?  new Date() :  new Date(this.params.t0);
+        let time_i = (t0 - this.times[i])/1000;
+
+        let path = '<path d=" M ' + this.transform_t(time_i) + ' ' + this.transform_y(this.data[i]) + ' ';
+        i--;
+
+        time_i = (t0 - this.times[i])/1000;
+
+        while(i >= 0 && time_i < this.params.time_span && typeof this.data[i] !== "undefined"){
+          time_i = (t0 - this.times[i])/1000;
+          path += 'L ' + this.transform_t(time_i) + ' ' + this.transform_y(this.data[i]) + ' ';
+          i--;
+        }
+
+        // add path to plt
+        plt_ += path + '" ' + Subtle.svg_style(plot_style) + ' />';
+        if(this.params.glow){ plt_ += path + '" ' + Subtle.svg_style(glow_style) + ' filter="url(#blur_filter)"/>'; }
+
+        // trim data and time arrays to keep the size constant
+        if(i > 0){
+          this.times.splice(0,i);
+          this.data.splice(0,i);
+        }
+      }
+
+      // draw endpoint
+      // ================
+      if (this.params.endpoint && typeof this.data[this.data.length-1] !== "undefined"){
+        let endpoint_style = { fill_color: this.params.color, stroke_width : 0 };
+        plt_ += this.draw_circle(0,this.data[this.data.length-1],this.params.stroke_width+3,endpoint_style);
+      }
+
+      return plt_;
+
+    }
+
+    // returns the svg code for labels, guides, etc.
+    this.draw_get_context_svg = function(width, height){
+      var svg_ = "";
+
+      // display value on left for sparkline
+      if(this.params.value_on_left & this.params.override_text_left == ""){
+        svg_ += Subtle.svg_text(1, height * 0.5, Subtle.ROUND(this.data[this.data.length-1]) + this.params.units, {center_vertically: true });
+      }
+      if(this.params.override_text_left != ""){
+        svg_ += Subtle.svg_text(1, height * 0.5, this.params.override_text_left, {center_vertically: true });
+      }
+
+      // 1) draw guides and limits
+      // =========================
+      this.line_limit_style.stroke_color = Subtle.COLORS["control"];
+      this.text_limit_style.color = Subtle.COLORS["control"];
+
+      if(this.params.shade_limits){
+        // shaded limits
+        let x0 = this.params.left_offset;
+        let y0 = this.transform_y(this.params.limit_high);
+        let x1 = width;
+        let y1 = this.transform_y(this.params.limit_low);
+        svg_ += Subtle.svg_rectangle(x0,y0,x1-x0,y1-y0,{fill_color: Subtle.COLORS["control"], stroke_width:0});
+
+      } else {
+        // normal limits
+        if(!Number.isNaN(this.params.limit_high)){
+          // draw line and text of top limit
+          svg_ += this.draw_line(this.params.time_span,this.params.limit_high,0,this.params.limit_high, this.line_limit_style);
+          svg_ += Subtle.svg_text(5 + this.params.left_offset,this.transform_y(this.params.limit_high) + 16,this.params.limit_high + this.params.units, this.text_limit_style);
+        }
+        if(!Number.isNaN(this.params.limit_low)){
+          // draw line and text of bottom limit
+          svg_ += this.draw_line(this.params.time_span,this.params.limit_low,0,this.params.limit_low, this.line_limit_style);
+          svg_ += Subtle.svg_text(5 + this.params.left_offset,this.transform_y(this.params.limit_low) - 5,this.params.limit_low + this.params.units, this.text_limit_style);
+        }
+      }
+
+
+      // 3) draw x label
+      // ===============
+      if(this.params.show_labels){
+        this.labels_style.anchor = "middle";
+        svg_ += Subtle.svg_text((width - this.params.left_offset) *0.5 + this.params.left_offset,(height - 6),"- " + this.params.time_span + "s -",this.labels_style);
+      }
+
+      // 4) draw y labels
+      // ================
+      if(this.params.show_labels){
+        this.labels_style.anchor = "left";
+        svg_ += Subtle.svg_text(this.params.left_offset+5,height-6,Subtle.ROUND(this.params.y_min) + this.params.units,this.labels_style);
+        svg_ += Subtle.svg_text(this.params.left_offset+5,18,Subtle.ROUND(this.params.y_max) + this.params.units,this.labels_style);
+      }
+
+      return svg_;
+
+    }
+
+    this.draw = function(){
+      let height = this.object.offsetHeight;
+      let width = this.object.offsetWidth;
+
+      let plt_ = this.draw_get_main_svg(width, height);
+      let svg_ = this.draw_get_context_svg(width, height);
+
+      // draw everything to control
+      let content = Subtle.svg_markup(width, height, plt_ + svg_);
+      //if(content.includes("NaN")) return;
+      this.object.innerHTML = content;
+
+    }
+
+    // =========================================================================
+		// UPDATE
+		// =========================================================================
+    this.update = function(value, time = "", draw_after_update = true){
+
+      // calculate elapsed time from the last time this function was called in seconds
+      if(time == "") time = new Date();
+      else time = new Date(time);
+      this.times.push(time);
+
+      // update data queue (push new value)
+      this.data.push(value);
+      this.current_value = value;
+
+      // clear min and max
+      // save if min or max
+      if( this.params.y_auto ){
+        if (this.max_value < value) {
+          this.max_value = value;
+          this.params.y_max = this.max_value + (this.max_value - this.min_value) * 0.25;
+        };
+        if (this.min_value > value) {
+          this.min_value = value;
+          this.params.y_min = this.min_value - (this.max_value - this.min_value) * 0.25;
+        };
+      }
+
+      if(draw_after_update) { this.draw(); }
+
+    }
+  }
+}
+
+
+//svg_view.js
+Subtle.SvgView = class SvgView{
+
+  constructor(object, parameters){
+
+    this.params = {
+      img : '',
+      onload : function(){},
+      stretch : true,
+      hover_effect : true,
+    };
+
+    for(const p in parameters){ this.params[p] = parameters[p]; };
+
+    // =========================================================================
+    // OTHER
+    // =========================================================================
+    this.object = (typeof object === "string" ? document.getElementById(object) : object);
+
+    // =========================================================================
+    // DRAW CONTROL
+    // =========================================================================
+    this.draw = function(){
+
+      var parent = this;
+      var xhttp = new XMLHttpRequest();
+      xhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+          let data = this.responseText;
+          let ctr_ = '';
+          ctr_ += '<div class="svg_view_container' + (parent.params.stretch ? ' stretch' : '') + '">';
+          ctr_ += data;
+          ctr_ += '</div>';
+          parent.object.innerHTML = ctr_;
+
+          parent.params.onload();
+        }
+      };
+      xhttp.open("GET", this.params.img, true);
+      xhttp.send();
+    }
+
+    // =========================================================================
+    // UPDATE
+    // =========================================================================
+    this.set_child_color = function(item, color){
+      if(color in Subtle.COLORS) color = Subtle.COLORS[color];
+      document.getElementById(item).style.fill = color;
+    }
+
+    this.set_child_text = function(item, text){
+      document.getElementById(item).innerHTML = text;
+    }
+
+    this.set_child_onclick = function(item, onclick){
+      let it = document.getElementById(item);
+      it.onclick = onclick;
+
+      if(this.params.hover_effect){
+        it.style.cursor = "pointer";
+        it.onmouseover = function(){ it.style.opacity=0.75 };
+        it.onmouseout = function(){ it.style.opacity=1 };
+      }
+    }
+
+    this.set_child_bind = function(item, sub_item){
+      let it1 = document.getElementById(item);
+      let it2 = document.getElementById(sub_item);
+
+      it2.style.opacity = 0;
+
+      var hover_effect = this.params.hover_effect;
+      if(hover_effect) it1.style.cursor = "pointer";
+
+      it1.onmouseover = function(){ it2.style.opacity=1; if(hover_effect) it1.style.opacity = 0.75; };
+      it1.onmouseout  = function(){ it2.style.opacity=0; if(hover_effect) it1.style.opacity = 1; };
+    }
+
+    this.set_child_tooltip = function(item, tooltip){
+      let it = document.getElementById(item);
+
+      // add hover effect
+      if(this.params.hover_effect){
+        it.style.cursor = "pointer";
+        it.onmouseover = function(){ it.style.opacity=0.75 };
+        it.onmouseout = function(){ it.style.opacity=1 };
+      }
+
+      // add tippy tooltip
+      if(typeof tippy !== "undefined") tippy('#' + it.id, {content:tooltip, allowHTML: true})
+      else console.log("Tooltip error: tippy.js not included");
+    }
+
+    this.set_child_for_html = function(item){
+      let it = document.getElementById(item);
+      let bbox = it.getBBox();
+
+      let code = "";
+      code += '<foreignObject x="' + bbox.x + '" y="' + bbox.y + '" width="' + bbox.width + '" height="' + bbox.height + '">';
+      code += '<div style="height:100%; width:100%" id="' + item + '"></div>';
+      code += '</foreignObject>';
+
+      it.outerHTML = code;
+    }
+
+    // =========================================================================
+    // AUTO INITIALIZE
+    // =========================================================================
+    this.draw();
+
+  }
+
+
+}
+
+
+//sparkline.js
+Subtle.Sparkline = class Sparkline{
+
+  constructor(object, parameters = {}){
+
+    this.params = {
+      fade: true,
+      value_on_left: false,
+      endpoint: true,
+      glow: false,
+    };
+
+    for(const p in parameters){ this.params[p] = parameters[p] }
+
+    ////////////////////
+
+    this.object = (typeof object === "string" ? document.getElementById(object) : object);
+
+    var tc = new Subtle.TimePlot(object, this.params);
+
+    this.draw = function(){ tc.draw() }
+    this.update = function(value, time = ""){ tc.update(value, time) }
+
+  }
+
+}
+
+
+//text_simple.js
+Subtle.TextSimple = class TextSimple{
+
+  constructor(object, parameters = {}){
+    // =========================================================================
+		// PARAMETERES
+		// =========================================================================
+
+    this.params = {
+      value : 0,
+      units : "",
+      v_align : "center",
+      h_align : "center",
+      rounding: 2,
+      font_size: 36,
+    };
+    for(const p in parameters){ this.params[p] = parameters[p]; };
+
+    // =========================================================================
+		// OTHER
+		// =========================================================================
+    this.object = (typeof object === "string" ? document.getElementById(object) : object);
+
+		// =========================================================================
+		// DRAW CONTROL
+		// =========================================================================
+    this.draw = function(){
+      let ctr_ = "";
+
+      let v_align = this.params.v_align;
+      let h_align = this.params.h_align;
+      if(v_align == "top") v_align = "flex-start";
+      if(v_align == "bottom") v_align = "flex-end";
+      if(h_align == "left") h_align = "flex-start";
+      if(h_align == "right") h_align = "flex-end";
+
+      let units_color = Subtle.COLORS["control"];
+      ctr_ += '<div style="display:flex; align-items:' + v_align + '; justify-content:' + h_align + '; height:100%">';
+      ctr_ += '<div class="at_font" style="font-size:' + this.params.font_size + 'px;"><span>' + Subtle.ROUND(this.params.value, this.params.rounding) + '</span>' + (this.params.units != "" ? ' <span style="color:' + units_color + '">' + this.params.units + '</span>' : '') +  '</div>';
+      ctr_ += '</div>';
+
+      this.object.innerHTML = ctr_;
+    }
+
+    // =========================================================================
+		// UPDATE
+		// =========================================================================
+    this.update = function(text){
+      this.object.childNodes[0].childNodes[0].childNodes[0].innerHTML = Subtle.ROUND(text, this.params.rounding);
+    }
+
+    // =========================================================================
+		// AUTO INITIALIZE
+		// =========================================================================
+    this.draw();
+
+
+  }
+
+
 }
 
 
@@ -2771,6 +2259,617 @@ Subtle.svg_sort_buttons = function(mode = "down"){ // mode = up, down
 }
 
 
+//fillbar.js
+Subtle.FillBar = class FillBar{
+
+    constructor(object, parameters){
+
+      this.params = {
+        min_val : 0,
+        max_val : 1,
+
+        vertical : false,
+        color: "primary",
+        background_color: "control",
+        smooth : false,
+        border_radius : 10,
+        bar_width : 28,
+        font_size : 14,
+
+        show_label : true,
+        units : "",
+
+        rounding : 2,
+
+      };
+
+      for(const p in parameters){ this.params[p] = parameters[p]; };
+
+      // =========================================================================
+  		// OTHER
+  		// =========================================================================
+      this.object = (typeof object === "string" ? document.getElementById(object) : object);
+
+      this.value = this.params.min_val;
+
+      // =========================================================================
+  		// DRAW CONTROL
+  		// =========================================================================
+      this.draw = function(){
+        let params_color = this.params.color in Subtle.COLORS ? Subtle.COLORS[this.params.color] : this.params.color;
+        let params_background_color = this.params.background_color in Subtle.COLORS ? Subtle.COLORS[this.params.background_color] : this.params.background_color;
+
+        let ctr_ = '';
+
+        //
+        ctr_ = '<div class="fillbar_parent">';
+
+        //
+        let style = 'style="';
+        style += 'border-radius:' + this.params.border_radius + 'px;';
+        style += (this.params.vertical ? 'width:' : 'height:') + this.params.bar_width + 'px;';
+        style += 'background-color:' + params_background_color + ';';
+        style += 'font-size:' + this.params.font_size + 'px;';
+        style += '"';
+        ctr_ += '<div class="' + (this.params.vertical ? 'fillbar_v' : 'fillbar') + '" ' + style + '>';
+
+        //
+        style = 'style="';
+        style += 'background-color:' + params_color + ';';
+        if(this.params.vertical){
+            style += 'border-bottom-right-radius:' + this.params.border_radius + 'px;';
+            style += 'border-bottom-left-radius:' + this.params.border_radius + 'px;';
+            style += 'height:' + (100 * this.value / (this.params.max_val - this.params.min_val)) + '%;';
+            style += 'width:' + this.params.bar_width + 'px;';
+        } else {
+          style += 'border-top-left-radius:' + this.params.border_radius + 'px;';
+          style += 'border-bottom-left-radius:' + this.params.border_radius + 'px;';
+          style += 'width:' + (100 * this.value / (this.params.max_val - this.params.min_val)) + '%;';
+          style += 'height:' + this.params.bar_width + 'px;';
+          style += 'line-height:' + this.params.bar_width + 'px;';
+        }
+        if(this.params.smooth){ style += 'transition: width 0.5s, height 0.5s;' }
+        style += '"';
+        ctr_ += '<div class="' + (this.params.vertical ? 'fillbar_v' : 'fillbar') + '" ' + style + '>';
+
+        //
+        if(this.params.show_label) { ctr_ += Subtle.ROUND(this.value, this.params.rounding) + this.params.units.toString(); }
+
+        //
+        ctr_ += '</div></div></div>';
+
+        this.object.innerHTML = ctr_;
+    }
+
+    this.update = function(value){
+
+      if(Number.isNaN(this.value)) { this.value = value; this.draw() };
+      this.value = value;
+      
+      let bar = this.object.childNodes[0].childNodes[0].childNodes[0];
+      if(this.params.vertical){
+        bar.style.height = (100 * this.value / (this.params.max_val - this.params.min_val)) + "%";
+      }
+      else{
+        bar.style.width =  (100 * this.value / (this.params.max_val - this.params.min_val)) + "%";
+      }
+
+      if(this.params.show_label){
+        bar.innerHTML = Subtle.ROUND(this.value, this.params.rounding) + this.params.units.toString();
+      }
+
+
+    }
+
+    // autoinitilize
+    this.draw();
+  }
+}
+
+
+//scale.js
+Subtle.Scale = class Scale{
+
+    constructor(object, parameters){
+
+    this.params = {
+        min_val : 0,
+        max_val : 1,
+
+        vertical : false,
+        color: "primary",
+        background_color: "control",
+        indicator_color: "control",
+        indicator_size: 10,
+
+        border_radius : 3,
+        bar_width : 20,
+        inner_padding : 5,
+        offset : 10,
+
+        limit_low : NaN,
+        limit_high : NaN,
+        show_limit_labels : false,
+        shade_limits : true,
+        ticks : [],
+
+        enable_history : true,
+        history_length : 3600, // length in seconds
+
+        rounding : 2,
+    };
+
+    for(const p in parameters){ this.params[p] = parameters[p]; };
+
+    // =========================================================================
+    // OTHER
+    // =========================================================================
+    this.object = (typeof object === "string" ? document.getElementById(object) : object);
+
+    this.line_limit_style = { stroke_color: "#000000", stroke_width: 1}
+    this.label_style = { font_size:'16px', center_vertically: true };
+
+    this.transform_v = function(v){ return (v - this.params.min_val) / (this.params.max_val - this.params.min_val) }
+
+    this.value = 0.5;
+    this.last_time = new Date();
+
+    this.history = [];
+    this.history_t = [];
+
+    // =========================================================================
+  	// DRAW CONTROL
+  	// =========================================================================
+    this.draw = function(){
+        let params_color = this.params.color in Subtle.COLORS ? Subtle.COLORS[this.params.color] : this.params.color;
+        let params_background_color = this.params.background_color in Subtle.COLORS ? Subtle.COLORS[this.params.background_color] : this.params.background_color;
+        let params_indicator_color = this.params.indicator_color in Subtle.COLORS ? Subtle.COLORS[this.params.indicator_color] : this.params.indicator_color;
+
+
+        let height = this.object.offsetHeight;
+        let width = this.object.offsetWidth;
+
+        let cx = width*0.5 + this.params.offset;
+        let cy = height*0.5;
+
+        if(!this.params.vertical){
+            let aux = height;
+            height = width;
+            width = aux;
+
+            cx = width*0.5 + this.params.offset;
+            cy = height*0.5;
+        }
+
+        let svg_ = "";
+
+
+        // draw background rectangle
+        let bar_w = this.params.bar_width;
+        let bgstyle = {fill_color: params_background_color, stroke_width: 0};
+        if(this.params.vertical){
+            svg_ += Subtle.svg_rectangle(cx-bar_w*0.5, 0, bar_w, height, bgstyle, this.params.border_radius);
+        } else {
+            svg_ += Subtle.svg_rectangle(0, cx-bar_w*0.5, height, bar_w, bgstyle, this.params.border_radius);
+        }
+
+        // draw limits
+        /*let label_style = { anchor: "end", font_size:'16px', center_vertically: true };
+
+        if(!Number.isNaN(this.params.limit_high) && !this.params.shade_limits){
+            let limit_y = height*this.transform_v(this.params.limit_high);
+            if(this.params.vertical){
+                svg_ += Subtle.svg_line(cx-bar_w*0.5, limit_y, cx+bar_w*0.5, limit_y, this.line_limit_style);
+                
+            } else {
+                svg_ += Subtle.svg_line(limit_y, cx-bar_w*0.5, limit_y, cx+bar_w*0.5, this.line_limit_style);
+                //svg_ += Subtle.svg_rectangle(limit_y, cx-bar_w*0.5, height-limit_y, bar_w, { fill_color: "#888888", stroke_width: 0 }, this.params.border_radius);
+                //svg_ += Subtle.svg_rectangle(limit_y, cx-bar_w*0.5, 10, bar_w, { fill_color: "#888888", stroke_width: 0 }, 0);
+            }
+
+            // label
+            if(this.params.show_limit_labels){
+                if(this.params.vertical){
+                    svg_ += Subtle.svg_text(limit_y, cx-bar_w*0.5-3, Subtle.ROUND(this.params.limit_high, this.params.rounding), label_style)
+                } else {
+                    label_style.anchor = "middle";
+                    svg_ += Subtle.svg_text(limit_y, cx-bar_w*0.5-10, Subtle.ROUND(this.params.limit_high, this.params.rounding), label_style)
+                }
+            }
+
+        }
+        if(!Number.isNaN(this.params.limit_low) && !this.params.shade_limits){
+            let limit_y = height*this.transform_v(this.params.limit_low);
+            if(this.params.vertical){
+                svg_ += Subtle.svg_line(cx-bar_w*0.5, limit_y, cx+bar_w*0.5, limit_y, this.line_limit_style);
+            } else {
+                svg_ += Subtle.svg_line(limit_y, cx-bar_w*0.5, limit_y, cx+bar_w*0.5, this.line_limit_style);
+            }
+
+            // label
+            if(this.params.show_limit_labels){
+                if(this.params.vertical){
+                    svg_ += Subtle.svg_text(cx-bar_w*0.5-3, limit_y, Subtle.ROUND(this.params.limit_low, this.params.rounding), label_style)
+                } else {
+                    label_style.anchor = "middle";
+                    svg_ += Subtle.svg_text(limit_y, cx-bar_w*0.5-10, Subtle.ROUND(this.params.limit_low, this.params.rounding), label_style)
+                }
+
+            }
+
+        }*/
+
+        ///////
+        if(this.params.shade_limits){
+            let shade_color = Subtle.COLOR_MODE == "dark" ? "#EDEDED" : "#959595";
+
+            let lh = !Number.isNaN(this.params.limit_high) ? height*this.transform_v(this.params.limit_high) : height;
+            let lw = !Number.isNaN(this.params.limit_low) ? height*this.transform_v(this.params.limit_low) : 0;
+    
+            if(!Number.isNaN(this.params.limit_low) && !Number.isNaN(this.params.limit_high)){
+                if(this.params.vertical){
+                    svg_ += Subtle.svg_rectangle(cx-bar_w*0.5, lw, bar_w, lh-lw, { fill_color: shade_color, stroke_width: 0 }, 0);
+                } else {
+                    svg_ += Subtle.svg_rectangle(lw, cx-bar_w*0.5, lh-lw, bar_w, { fill_color: shade_color, stroke_width: 0 }, 0);    
+                }
+            }
+            else if(!Number.isNaN(this.params.limit_high)){
+                if(this.params.vertical){
+                    svg_ += Subtle.svg_rectangle(cx-bar_w*0.5, lw, bar_w, lh-lw, { fill_color: shade_color, stroke_width: 0 }, this.params.border_radius);
+                    svg_ += Subtle.svg_rectangle(cx-bar_w*0.5, (lh+lw)*0.5, bar_w, (lh-lw)*0.5, { fill_color: shade_color, stroke_width: 0 }, 0);    
+                } else {
+                    svg_ += Subtle.svg_rectangle(lw, cx-bar_w*0.5, lh-lw, bar_w, { fill_color: shade_color, stroke_width: 0 }, this.params.border_radius);
+                    svg_ += Subtle.svg_rectangle((lh+lw)*0.5, cx-bar_w*0.5, (lh-lw)*0.5, bar_w, { fill_color: shade_color, stroke_width: 0 }, 0);    
+                }
+            }
+            else if(!Number.isNaN(this.params.limit_low)){
+                if(this.params.vertical){
+                    svg_ += Subtle.svg_rectangle(cx-bar_w*0.5, lw, bar_w, lh-lw, { fill_color: shade_color, stroke_width: 0 }, this.params.border_radius);
+                    svg_ += Subtle.svg_rectangle(cx-bar_w*0.5, lw, bar_w, (lh-lw)*0.5, { fill_color: shade_color, stroke_width: 0 }, 0);
+                } else {
+                    svg_ += Subtle.svg_rectangle(lw, cx-bar_w*0.5, lh-lw, bar_w, { fill_color: shade_color, stroke_width: 0 }, this.params.border_radius);
+                    svg_ += Subtle.svg_rectangle(lw, cx-bar_w*0.5, (lh-lw)*0.5, bar_w, { fill_color: shade_color, stroke_width: 0 }, 0);
+                }
+            }
+        } else {
+            if(!Number.isNaN(this.params.limit_low)){
+                let limit_y = height*this.transform_v(this.params.limit_low);
+                if(this.params.vertical){
+                    svg_ += Subtle.svg_line(cx-bar_w*0.5, limit_y, cx+bar_w*0.5, limit_y, this.line_limit_style);
+                } else {
+                    svg_ += Subtle.svg_line(limit_y, cx-bar_w*0.5, limit_y, cx+bar_w*0.5, this.line_limit_style);
+                }
+            }
+
+            if(!Number.isNaN(this.params.limit_high) && !this.params.shade_limits){
+                let limit_y = height*this.transform_v(this.params.limit_high);
+                if(this.params.vertical){
+                    svg_ += Subtle.svg_line(cx-bar_w*0.5, limit_y, cx+bar_w*0.5, limit_y, this.line_limit_style);
+                } else {
+                    svg_ += Subtle.svg_line(limit_y, cx-bar_w*0.5, limit_y, cx+bar_w*0.5, this.line_limit_style);
+                }
+            }    
+        }
+
+
+        // ticks
+        for(const item in this.params.ticks){
+            let tick = height * this.transform_v(this.params.ticks[item]);
+            if(this.params.vertical){
+                svg_ += Subtle.svg_line(cx, tick, cx+bar_w*0.5, tick, this.line_limit_style);
+                svg_ += Subtle.svg_text(cx+bar_w*0.5+5, tick, Subtle.ROUND(this.params.ticks[item], this.params.rounding), this.label_style)
+            } else {
+                this.label_style.anchor = "middle";
+                svg_ += Subtle.svg_line(tick, cx, tick, cx+bar_w*0.5, this.line_limit_style);
+                svg_ += Subtle.svg_text(tick, cx+bar_w*0.5+10, Subtle.ROUND(this.params.ticks[item], this.params.rounding), this.label_style)
+            }
+        }
+
+
+        // draw values retangle
+        if(this.history.length > 0){
+            let y0 = height * this.transform_v( Math.min(...this.history) );
+            let y1 = height * this.transform_v( Math.max(...this.history) );
+            let style = {fill_color: params_color, stroke_width: 0};
+            if(this.params.vertical){
+                svg_ += Subtle.svg_rectangle(cx-bar_w*0.5+this.params.inner_padding, y0, bar_w - this.params.inner_padding*2, y1-y0, style, this.params.border_radius*0.5)
+            } else {
+                svg_ += Subtle.svg_rectangle(y0, cx-bar_w*0.5+this.params.inner_padding, y1-y0, bar_w - this.params.inner_padding*2, style, this.params.border_radius*0.5)
+            }
+        }
+
+        // draw indicator (small triangle)
+        let y = height * this.transform_v( this.value );
+        let path = '<path d=" M ';
+        let indicator_dy = this.params.indicator_size * 0.577;
+        if(this.params.vertical){
+            path += (cx-bar_w*0.5) + ' ' + y;
+            path += ' L ' + (cx-bar_w*0.5-this.params.indicator_size) + ' ' + (y-indicator_dy);
+            path += ' L ' + (cx-bar_w*0.5-this.params.indicator_size) + ' ' + (y+indicator_dy);
+            path += ' Z" ' + Subtle.svg_style({fill_color: params_indicator_color, stroke_width:0 })  + ' />';
+
+        } else {
+            path += y + ' ' + (cx-bar_w*0.5);
+            path += ' L ' + (y-indicator_dy) + ' ' + (cx-bar_w*0.5-this.params.indicator_size);
+            path += ' L ' + (y+indicator_dy) + ' ' + (cx-bar_w*0.5-this.params.indicator_size);
+            path += ' Z" ' + Subtle.svg_style({fill_color: params_indicator_color, stroke_width:0 })  + ' />';
+
+        }
+        svg_ += path;
+
+        // draw
+        if(this.params.vertical){
+            let content = Subtle.svg_markup(width, height, svg_);
+            this.object.innerHTML = content;
+        } else {
+            let content = Subtle.svg_markup(height, width, svg_);
+            this.object.innerHTML = content;
+        }
+
+    }
+
+    // =========================================================================
+  	// UPDATE
+  	// =========================================================================
+    this.update = function(value, time = ""){
+
+        this.value = value;
+        if(value < this.params.min_val) this.value = this.params.min_val;
+        if(value > this.params.max_val) this.value = this.params.max_val;
+
+        /*
+        // calculate elapsed time from the last time this function was called in seconds
+        var current_time = new Date();
+        if(time != ""){ current_time = new Date(time); }
+        var time_diff = (current_time - this.last_time) / 1000;
+        this.last_time = current_time;
+
+        //
+        let min_i = 0;
+        for (var i = 0; i < this.history_t.length; i++) {
+            this.history_t[i] = this.history_t[i] + time_diff;
+            if(this.history_t[i] > this.params.history_length) { min_i = i+1; }
+        }
+        this.history.push(value);
+        this.history_t.push(0);
+
+        this.history.splice(0, min_i);
+        this.history_t.splice(0, min_i);
+        */
+
+        // add time and value
+        if(time == "") time = Math.floor(new Date() / 1000);
+        else time = Math.floor(new Date(time) / 1000);
+
+        this.history.push(value);
+        this.history_t.push(time);
+
+        // remove old times
+        let t0 = this.params.t0 == "" ?  Math.floor(new Date() / 1000) :  Math.floor(new Date(this.params.t0 / 1000));
+        for (var i = this.history_t.length -1; i > 0; i--) {
+            if(t0 - this.history_t[i] > this.params.history_length) break;
+        }
+
+        this.history.splice(0, i);
+        this.history_t.splice(0, i);
+
+
+        //
+        this.draw();
+
+    }
+
+    }
+}
+
+
+//line_plot.js
+Subtle.LinePlot = class LinePlot{
+
+  constructor(object, parameters){
+
+    this.params = {
+      y_max : 1,
+      y_min : -1,
+
+      x_min : 0,
+      x_max : 1,
+      values_x : [0],
+
+      direction: 'horizontal', // horizontal, vertical
+
+      show_grid : true,
+      show_points : true,
+      show_ticks : false,
+      ticks_major : [1,-1],
+      ticks_minor : [0.2,-0.2],
+
+      show_labels : false,
+      label_offset : 30,
+      labels : [""],
+
+      show_values : false,
+      value_offset : 30,
+
+      color : Subtle.COLORS["primary"],
+      stroke_width : 2,
+      grid_stroke_width : 1,
+
+    };
+
+    for(const p in parameters){ this.params[p] = parameters[p]; };
+
+
+    // =========================================================================
+    // OTHER
+    // =========================================================================
+    this.object = (typeof object === "string" ? document.getElementById(object) : object);
+    this.values_x = this.params.values_x;
+    this.values_y = [0];
+
+    // =========================================================================
+    // USEFUL FUNCTIONS
+    // =========================================================================
+    // scaling helper functions
+    // transform functions are flexible to allow swapping the x and y axis (vertical or horizontal)
+    this.transform_y = function(v, v_max, v_min, v_offset_top, v_offset_bottom){ return v_offset_top + (v_max - v) * (this.object.offsetHeight - v_offset_top - v_offset_bottom) / (v_max - v_min); }
+    this.transform_x = function(v, v_max, v_min, v_offset_left, v_offset_right){ return v_offset_left + (this.object.offsetWidth - v_offset_left - v_offset_right) * (v - v_min) / (v_max - v_min); }
+
+    // =========================================================================
+    // DRAW CONTROL
+    // =========================================================================
+    this.draw = function(){
+
+      // get size
+      let height = this.object.offsetHeight;
+      let width = this.object.offsetWidth;
+
+      let svg_ = "";
+
+      // swap transformation functions if vertical
+      var parent = this;
+      let t_x = function(x){ return parent.transform_x(x,parent.params.x_max, parent.params.x_min, 10, 10) };
+      let t_y = function(y){ return parent.transform_y(y,parent.params.y_max, parent.params.y_min, parent.params.show_values ? parent.params.value_offset : 1, parent.params.show_labels ? parent.params.label_offset : 1) };
+      if(this.params.direction == "vertical"){
+        t_x = function(x){ return parent.transform_y(x,parent.params.x_max, parent.params.x_min, 10, 10) };
+        t_y = function(y){ return parent.transform_x(y,parent.params.y_max, parent.params.y_min, parent.params.show_labels ? parent.params.label_offset : 1, parent.params.show_values ? parent.params.value_offset : 1) };
+      }
+
+      // 1) Draw grid
+      // ============
+      let grid_style = {stroke_color: Subtle.COLORS["control"], stroke_width: this.params.grid_stroke_width};
+
+      for(let i = 0; i < this.values_x.length; i++){
+        // draw line from y_min to y_max
+        if(this.params.show_grid){
+          let x0 = t_x(this.values_x[i]);
+          let y0 = t_y(this.params.y_min);
+          let x1 = t_x(this.values_x[i]);
+          let y1 = t_y(this.params.y_max);
+
+          if(this.params.direction == "horizontal") { svg_ += Subtle.svg_line(x0, y0, x1, y1, grid_style) }
+          else { svg_ += Subtle.svg_line(y0, x0, y1, x1, grid_style) }
+        }
+
+        if(this.params.show_ticks){
+          for(const tick in this.params.ticks_major){
+            let x0 = t_x(this.values_x[i])-10;
+            let x1 = t_x(this.values_x[i])+10;
+            let y = t_y(this.params.ticks_major[tick]);
+
+            if(this.params.direction == "horizontal") { svg_ += Subtle.svg_line(x0, y, x1, y, grid_style); }
+            else { svg_ += Subtle.svg_line(y, x0, y, x1, grid_style); }
+          }
+          for(const tick in this.params.ticks_minor){
+            let x0 = t_x(this.values_x[i])-5;
+            let x1 = t_x(this.values_x[i])+5;
+            let y = t_y(this.params.ticks_minor[tick]);
+
+            if(this.params.direction == "horizontal") { svg_ += Subtle.svg_line(x0, y, x1, y, grid_style); }
+            else { svg_ += Subtle.svg_line(y, x0, y, x1, grid_style); }
+          }
+        }
+      }
+
+
+      // 2) Draw plot
+      // ============
+      // get styles for svg
+      let plot_style = { stroke_color: (this.params.color in Subtle.COLORS ? Subtle.COLORS[this.params.color] : this.params.color), stroke_width: this.params.stroke_width, stroke_linecap: "round" };
+      let circle_style = { fill_color: (this.params.color in Subtle.COLORS ? Subtle.COLORS[this.params.color] : this.params.color), stroke_width:0 };
+
+      // start path, draw first point
+      let x = t_x(this.values_x[0]);
+      let y = t_y(this.values_y[0]);
+
+      let path = "";
+      if(this.params.direction == "horizontal") {
+        path = '<path d=" M ' + x + ' ' + y + ' ';
+        if(this.params.show_points) svg_ += Subtle.svg_circle(x,y,this.params.stroke_width*2,circle_style);
+      } else {
+        path = '<path d=" M ' + y + ' ' + x + ' ';
+        if(this.params.show_points) svg_ += Subtle.svg_circle(y,x,this.params.stroke_width*2,circle_style);
+      }
+
+      // draw path point by point
+      for(let i = 1; i < this.values_x.length; i++){
+        let x = t_x(this.values_x[i]);
+        let y = t_y(this.values_y[i]);
+
+        if(this.params.direction == "horizontal") {
+          path += 'L ' + x + ' ' + y + ' ';
+          if(this.params.show_points) svg_ += Subtle.svg_circle(x,y,this.params.stroke_width*2,circle_style);
+        } else {
+          path += 'L ' + y + ' ' + x + ' ';
+          if(this.params.show_points) svg_ += Subtle.svg_circle(y,x,this.params.stroke_width*2,circle_style);
+        }
+
+      }
+
+      // add path to svg
+      svg_ += path + '" ' + Subtle.svg_style(plot_style) + ' />';
+
+      // 3) Draw labels
+      // ==============
+      if(this.params.show_labels){
+        for(const i in this.params.labels){
+          let x = t_x(this.values_x[i]);
+          let y = t_y(this.params.y_min);
+
+          if(this.params.direction == "horizontal") {
+            svg_ += Subtle.svg_text(x,y+10,this.params.labels[i],{center_vertically : true, anchor: "middle", font_size:"16px" })
+          } else {
+            svg_ += Subtle.svg_text(y-10,x,this.params.labels[i],{center_vertically : true, anchor: "end", font_size:"16px" })
+          }
+        }
+      }
+
+      // 4) Draw values
+      // ==============
+      if(this.params.show_values){
+        for(const i in this.values_x){
+          let x = t_x(this.values_x[i]);
+          let y = t_y(this.params.y_max);
+
+          if(this.params.direction == "horizontal") {
+            svg_ += Subtle.svg_text(x,y-10,this.values_y[i],{center_vertically : true, anchor: "middle", font_size:"16px" })
+          } else {
+            svg_ += Subtle.svg_text(y+10,x,this.values_y[i],{center_vertically : true, anchor: "start", font_size:"16px" })
+          }
+        }
+      }
+
+
+      // 5) Draw control
+      // ===============
+      let content = Subtle.svg_markup(width, height, svg_);
+
+
+      this.object.innerHTML = content;
+
+    }
+
+    // =========================================================================
+    // UPDATE CONTROL
+    // =========================================================================
+    this.update = function(values, index = -1){
+
+      if(index == -1){
+        this.values_y = values;
+      }
+      else{
+        this.values_y[index = values];
+      }
+
+      this.draw();
+
+
+    }
+  }
+
+}
+
+
 //table.js
 Subtle.Table = class Table{
 
@@ -3088,65 +3187,159 @@ Subtle.Table = class Table{
 }
 
 
-//text_simple.js
-Subtle.TextSimple = class TextSimple{
+//web_plot.js
+Subtle.WebPlot = class WebPlot{
 
-  constructor(object, parameters = {}){
-    // =========================================================================
-		// PARAMETERES
-		// =========================================================================
+  constructor(object, parameters){
 
     this.params = {
-      value : 0,
-      units : "",
-      v_align : "center",
-      h_align : "center",
-      rounding: 2,
-      font_size: 36,
+      labels : ["A","B","C","D","E","F"],
+      max_value : 1,
+      min_value : 0,
+
+      limit_high : NaN,
+      limit_low : NaN,
+
+      show_grid : true,
+      show_tooltips : true,
+
+      endpoint_size : 5,
+      padding : 50,
+
+      color : "primary",
+      opacity : 0.5,
     };
+
     for(const p in parameters){ this.params[p] = parameters[p]; };
 
     // =========================================================================
-		// OTHER
-		// =========================================================================
+    // OTHER
+    // =========================================================================
     this.object = (typeof object === "string" ? document.getElementById(object) : object);
+    this.values = [0,0,0,0,0,0];
 
+
+    // =========================================================================
+		// USEFUL FUNCTIONS
 		// =========================================================================
-		// DRAW CONTROL
-		// =========================================================================
+    // transform_val: receives a value r and a position p and returns the
+    // coordinates (x,y) of the point in the svg canvas
+
+    this.transform_val = function(r, p){
+      let R = this.params.max_value - this.params.min_value;
+      let H = this.object.offsetHeight;
+      let W = this.object.offsetWidth;
+
+      r = (r / R) * (((H > W ? W : H) - this.params.padding) * 0.5);
+
+      let alpha = 2 * Math.PI * p / this.params.labels.length;
+      let x = 0.5*W + r * Math.sin(alpha);
+      let y = 0.5*H - r * Math.cos(alpha);
+
+      return [x,y,r];
+    }
+
+
+    // =========================================================================
+    // DRAW CONTROL
+    // =========================================================================
     this.draw = function(){
-      let ctr_ = "";
+      let params_color = this.params.color in Subtle.COLORS ? Subtle.COLORS[this.params.color] : this.params.color;
 
-      let v_align = this.params.v_align;
-      let h_align = this.params.h_align;
-      if(v_align == "top") v_align = "flex-start";
-      if(v_align == "bottom") v_align = "flex-end";
-      if(h_align == "left") h_align = "flex-start";
-      if(h_align == "right") h_align = "flex-end";
+      let height = this.object.offsetHeight;
+      let width = this.object.offsetWidth;
 
-      let units_color = Subtle.COLORS["control"];
-      ctr_ += '<div style="display:flex; align-items:' + v_align + '; justify-content:' + h_align + '; height:100%">';
-      ctr_ += '<div class="at_font" style="font-size:' + this.params.font_size + 'px;"><span>' + Subtle.ROUND(this.params.value, this.params.rounding) + '</span>' + (this.params.units != "" ? ' <span style="color:' + units_color + '">' + this.params.units + '</span>' : '') +  '</div>';
-      ctr_ += '</div>';
+      let svg_ = "";
 
-      this.object.innerHTML = ctr_;
+      // get center
+      let x_c = width * 0.5;
+      let y_c = height * 0.5;
+
+
+
+      // 1) Draw limits
+      // ==============
+
+      if(!Number.isNaN(this.params.limit_high)){
+        let r = this.transform_val(this.params.limit_high, 0)[2];
+        svg_ += Subtle.svg_circle(x_c, y_c, r, {stroke_width: 1, stroke_color: Subtle.COLORS["control"]})
+      }
+      if(!Number.isNaN(this.params.limit_low)){
+        let r = this.transform_val(this.params.limit_low, 0)[2];
+        svg_ += Subtle.svg_circle(x_c, y_c, r, {stroke_width: 1, stroke_color: Subtle.COLORS["control"]})
+      }
+
+
+      // 2) Draw grid (spikes)
+      // =====================
+      if(this.params.show_grid){
+
+        let line_style = {stroke_color: Subtle.COLORS["control"]};
+        for(let i = 0; i < this.params.labels.length; i++){
+          let s_ = this.transform_val(this.params.max_value*1,i);
+          svg_ += Subtle.svg_line(x_c,y_c,s_[0],s_[1],line_style);
+
+          if(this.params.endpoint_size > 0){
+            let tooltip_id = 'custom_label_for_' + this.object.id + '_id_' + this.params.labels[i];
+            svg_ += '<g id="' + tooltip_id + '">' + Subtle.svg_circle(s_[0],s_[1],this.params.endpoint_size,{fill_color: Subtle.COLORS["control"], stroke_width: 0}) + '</g>';
+          }
+
+
+        }
+      }
+
+
+      // 3) Draw values
+      // ==============
+      let plot_style = { stroke_color: params_color, stroke_linecap: "round", fill_color: params_color, opacity: this.params.opacity };
+
+      // first value
+      let s_ = this.transform_val(this.values[0],0);
+      let path = '<path d=" M ' + s_[0] + ' ' + s_[1] + ' ';
+
+      // other values
+      for(let i = 1; i < this.params.labels.length; i++){
+        let s_ = this.transform_val(this.values[i], i);
+
+        path += 'L ' + s_[0] + ' ' + s_[1] + ' ';
+
+      }
+
+      svg_ += path + ' Z" ' + Subtle.svg_style(plot_style) + ' />';
+
+
+      // 4) Draw control
+      // ===============
+      let content = Subtle.svg_markup(width, height, svg_);
+
+      this.object.innerHTML = content;
+
+      if(this.params.show_tooltips){
+        for(let i = 0; i < this.params.labels.length; i++){
+          let tooltip_id = 'custom_label_for_' + this.object.id + '_id_' + this.params.labels[i];
+          if(typeof tippy !== "undefined") tippy('#' + tooltip_id, {content:this.params.labels[i]})
+          else console.log("Tooltip error: tippy.js not included");
+        }
+      }
+
     }
 
     // =========================================================================
-		// UPDATE
-		// =========================================================================
-    this.update = function(text){
-      this.object.childNodes[0].childNodes[0].childNodes[0].innerHTML = Subtle.ROUND(text, this.params.rounding);
-    }
-
+    // UPDATE CONTROL
     // =========================================================================
-		// AUTO INITIALIZE
-		// =========================================================================
-    this.draw();
+    this.update = function(values, index = -1){
 
+      if(index < 0){
+        this.values = values;
+      }
+      else if(index < this.params.labels.length){
+        this.values[index] = values;
+      }
 
+      this.draw();
+
+    }
   }
-
 
 }
 
@@ -3224,23 +3417,27 @@ Subtle.MultiTimePlot = class MultiTimePlot{
 }
 
 
-//tabs.js
-Subtle.TabsLayout = class TabsLayout {
+//map_view.js
+Subtle.MapView = class MapView{
 
-  constructor(object, tabs, parameters){
-
+  constructor(object, parameters = {}){
     // =========================================================================
 		// PARAMETERES
 		// =========================================================================
+
     this.params = {
-      show_labels : true,
-      show_labels_inline: false,
-      position : "center", // center, left, fill
-      color: Subtle.COLORS["primary"],
-      show_icons : true,
-      icon_size : 16,
-      dock_bottom: false,
-      direction: 'horizontal', // horizontal, vertical
+      provider: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', // get from http://leaflet-extras.github.io/leaflet-providers/preview/
+      leaflet_options: { attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>, &copy; <a href="https://openmaptiles.org/">OpenMapTiles</a> &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors'},
+
+      lat: 0,
+      lon: 0,
+      zoom: 2, // zoom number from 2 to 20
+
+      correct_icon_x : 6,
+      correct_icon_y : 7,
+
+      show_layer_control : false,
+
     };
 
     for(const p in parameters){ this.params[p] = parameters[p]; };
@@ -3249,768 +3446,571 @@ Subtle.TabsLayout = class TabsLayout {
 		// OTHER
 		// =========================================================================
     this.object = (typeof object === "string" ? document.getElementById(object) : object);
-    this.tabs = tabs;
+    this.map = L.map(this.object.id).setView([this.params.lat, this.params.lon], this.params.zoom);
+    this.control_layers = L.control.layers();
+
+    this.markers = {};
+    this.layer_groups = {};
+
+
+    this.get_icon_html = function(marker, icon, icon_left, icon_top){
+      let html = '';
+      html += '<div style="transform: translate(' + this.params.correct_icon_x + 'px,' + this.params.correct_icon_y + 'px)">';
+      html += '<div style="font-size:24px;';
+      html += 'margin-left:-' + icon_left + 'px;';
+      html += 'margin-top:-' + icon_top + 'px;';
+      //html += 'transform: rotate(' + this.markers[marker]["angle"] + 'deg);';
+      html += 'transform-origin: ' + icon_left + 'px ' + icon_top + 'px;'
+      html += '" id="' + this.object.id + "_" + marker + '" ';
+      html += '>';
+      html += icon;
+      html += '</div>';
+      html += '</div>';
+      return html;
+    }
+
+    this.update_layer_groups = function(){
+
+      this.control_layers.remove();
+      this.control_layers = L.control.layers();
+      // this.layer_groups = {};
+
+
+      for(const m in this.markers){
+        let marker = this.markers[m];
+
+        if(!(marker.group in this.layer_groups)){
+          this.layer_groups[marker.group] = [];
+        }
+
+        this.layer_groups[marker.group].push(marker.m);
+      }
+
+      for(const group in this.layer_groups){
+        var Lay = L.layerGroup(this.layer_groups[group]);
+        Lay.addTo(this.map);
+        this.control_layers.addOverlay(Lay, group);
+      }
+
+      if(this.params.show_layer_control){
+        this.control_layers.addTo(this.map);
+      }
+    }
+
+		// =========================================================================
+		// DRAW CONTROL
+		// =========================================================================
+    this.draw = function(){
+      this.map.addLayer(new L.TileLayer(this.params.provider, this.params.leaflet_options));
+
+      if(this.params.show_layer_control){
+        this.control_layers.addTo(this.map);
+
+        var ths = this;
+        this.map.on('overlayadd', function(){
+          for(const m in ths.markers){
+            ths.update_marker(m,{tooltip:ths.markers[m].tooltip});
+          }
+        });
+      }
+    }
+
+    // =========================================================================
+		// AUTO INIT
+    // =========================================================================
+    this.draw();
+
+    // =========================================================================
+		// UPDATE: MARKERS
+    // =========================================================================
+    this.update_marker = function(marker, properties = {}){
+
+      // if marker is new, create
+      if(!(marker in this.markers)){
+        this.markers[marker] = {"m" : new L.Marker([0,0])}
+
+        this.markers[marker]["m"].addTo(this.map);
+        this.markers[marker]["group"] = "default";
+        this.markers[marker]["rotation"] = 0;
+        this.markers[marker]["position"] = [0,0];
+        this.markers[marker]["icon"] = "";
+        this.markers[marker]["icon_left"] = 12;
+        this.markers[marker]["icon_top"] = 12;
+        this.markers[marker]["visible"] = true;
+        this.markers[marker]["tooltip"] = "";
+        this.markers[marker]["onclick"] = function(){};
+      }
+
+      // update marker properties
+      for(const p in properties){ this.markers[marker][p] = properties[p]; }
+
+
+      // update position
+      if("position" in properties){
+        var newLatLng = new L.LatLng(properties["position"][0], properties["position"][1]);
+        this.markers[marker]["m"].setLatLng(newLatLng);
+      }
+
+      // update icon and tooltip
+      if("icon" in properties || "icon_left" in properties || "icon_top" in properties || "icon_size" in properties || "visible" in properties || "tooltip" in properties ){
+
+        // icon
+        if("icon" in properties || "icon_left" in properties || "icon_top" in properties){
+          this.markers[marker]["m"].setIcon(new L.DivIcon({
+            className: 'my-div-icon',
+            html: this.markers[marker]["visibility"] ? "" : this.get_icon_html(marker, this.markers[marker]["icon"], this.markers[marker]["icon_left"], this.markers[marker]["icon_top"]),
+          }));
+        }
+
+
+        // tooltip
+        if(this.markers[marker]["tooltip"] != ""){
+          if(typeof tippy !== "undefined") tippy('#' + this.object.id + "_" + marker, {content: this.markers[marker]["tooltip"], allowHTML: true})
+          else console.log("Tooltip error: tippy.js not included");
+        }
+      }
+
+      // update angle
+      if("rotation" in properties){
+        document.getElementById(this.object.id + "_" + marker).style.transform = ("rotate(" + properties["rotation"] + "deg)")
+      }
+
+      // update onclick
+      if("onclick" in properties){
+        this.markers[marker]["m"].on('click', properties["onclick"])
+      }
+
+      // update groups
+      if("group" in properties){
+        this.update_layer_groups();
+      }
+
+    }
+
+    // =========================================================================
+		// UPDATE: TRACE
+    // =========================================================================
+    this.update_trace = function(trace, properties){
+      // if trace is new, create
+      if(!(trace in this.markers)){
+        this.markers[trace] = {"m" : new L.polyline([[0,0],[10,10]])}
+
+        this.markers[trace]["m"].addTo(this.map);
+        this.markers[trace]["group"] = "default";
+        this.markers[trace]["points"] = [];
+        this.markers[trace]["color"] = "#3388ff";
+        this.markers[trace]["width"] = 2;
+        this.markers[trace]["visible"] = true;
+        this.markers[trace]["onclick"] = function(){};
+        this.markers[trace]["onhover"] = function(){};
+      }
+
+      // update trace properties
+      for(const p in properties){ this.markers[trace][p] = properties[p]; }
+
+      // update points
+      if("points" in properties){
+        this.markers[trace]["m"].setLatLngs(properties["points"]);
+      }
+
+      // update color and other styles
+      if("color" in properties){ this.markers[trace]["m"].setStyle({color: properties["color"]}) }
+      if("width" in properties){ this.markers[trace]["m"].setStyle({weight: properties["weight"]}) }
+
+      // update onclick
+      if("onclick" in properties){
+        this.markers[trace]["m"].on('click', properties["onclick"]);
+      }
+
+      // update onhover
+      if("onhover" in properties){
+        this.markers[trace]["m"].on('mouseover', properties["onhover"]);
+      }
+
+      // update groups
+      if("group" in properties){
+        this.update_layer_groups();
+      }
+
+    }
+
+    // =========================================================================
+		// UPDATE: CIRCLE
+    // =========================================================================
+    this.update_circle = function(circle, properties){
+      // if circle is new, create
+      if(!(circle in this.markers)){
+        this.markers[circle] = {"m" : new L.circle([0,0])}
+
+        this.markers[circle]["m"].addTo(this.map);
+        this.markers[circle]["group"] = "default";
+        this.markers[circle]["radius"] = 0;
+        this.markers[circle]["position"] = [0,0];
+        this.markers[circle]["color"] = "#3388ff";
+        this.markers[circle]["opacity"] = 0.5;
+        this.markers[circle]["border_color"] = "#3388ff";
+        this.markers[circle]["border_width"] = 1;
+        this.markers[circle]["visible"] = true;
+        this.markers[circle]["onclick"] = function(){};
+        this.markers[circle]["onhover"] = function(){};
+      }
+
+      // update circle properties
+      for(const p in properties){ this.markers[circle][p] = properties[p]; }
+
+      // update position
+      if("position" in properties){
+        var newLatLng = new L.LatLng(properties["position"][0], properties["position"][1]);
+        this.markers[circle]["m"].setLatLng(newLatLng);
+      }
+
+      // update radius
+      if("radius" in properties){
+        this.markers[circle]["m"].setRadius(properties["radius"]);
+      }
+
+      // update color and other styles
+      if("color" in properties){ this.markers[circle]["m"].setStyle({fillColor: properties["color"]}) }
+      if("opacity" in properties){ this.markers[circle]["m"].setStyle({fillOpacity: properties["opacity"]}) }
+      if("border_color" in properties){ this.markers[circle]["m"].setStyle({color: properties["border_color"]}) }
+      if("border_width" in properties){ this.markers[circle]["m"].setStyle({weight: properties["border_width"]}) }
+
+      // update onclick
+      if("onclick" in properties){
+        this.markers[circle]["m"].on('click', properties["onclick"]);
+      }
+
+      // update onhover
+      if("onhover" in properties){
+        this.markers[circle]["m"].on('mouseover', properties["onhover"]);
+      }
+
+      // update groups
+      if("group" in properties){
+        this.update_layer_groups();
+      }
+
+    }
+
+    // =========================================================================
+		// UPDATE: POLYGON
+    // =========================================================================
+    this.update_polygon = function(polygon, properties){
+      // if polygon is new, create
+      if(!(polygon in this.markers)){
+        this.markers[polygon] = {"m" : new L.polygon([[0,0],[10,10]])}
+
+        this.markers[polygon]["m"].addTo(this.map);
+        this.markers[polygon]["group"] = "default";
+        this.markers[polygon]["points"] = [];
+        this.markers[polygon]["color"] = "#3388ff";
+        this.markers[polygon]["opacity"] = 0.5;
+        this.markers[polygon]["border_color"] = "#3388ff";
+        this.markers[polygon]["border_width"] = 1;
+        this.markers[polygon]["visible"] = true;
+        this.markers[polygon]["onclick"] = function(){};
+        this.markers[polygon]["onhover"] = function(){};
+      }
+
+      // update polygon properties
+      for(const p in properties){ this.markers[polygon][p] = properties[p]; }
+
+      // update points
+      if("points" in properties){
+        this.markers[polygon]["m"].setLatLngs(properties["points"]);
+      }
+
+      // update color and other styles
+      if("color" in properties){ this.markers[polygon]["m"].setStyle({fillColor: properties["color"]}) }
+      if("opacity" in properties){ this.markers[polygon]["m"].setStyle({fillOpacity: properties["opacity"]}) }
+      if("border_color" in properties){ this.markers[polygon]["m"].setStyle({color: properties["border_color"]}) }
+      if("border_width" in properties){ this.markers[polygon]["m"].setStyle({weight: properties["border_width"]}) }
+
+      // update onclick
+      if("onclick" in properties){
+        this.markers[polygon]["m"].on('click', properties["onclick"]);
+      }
+
+      // update onhover
+      if("onhover" in properties){
+        this.markers[polygon]["m"].on('mouseover', properties["onhover"]);
+      }
+
+      // update groups
+      if("group" in properties){
+        this.update_layer_groups();
+      }
+    }
+
+
+  }
+
+}
+
+
+//gauge.js
+Subtle.Gauge = class Gauge {
+
+  constructor(object, parameters){
+
+    // =========================================================================
+		// PARAMETERES
+		// =========================================================================
+    this.params = {
+      max_val : 1,
+      min_val : 0,
+      units : "",
+      stroke_width : 10,
+      color : "primary",
+      background_color : "control",
+      hand_color : "control",
+      inner_padding : 0,
+
+      show_label : true,
+      show_hand : true,
+      linecap: "round",
+      opening_angle: 0.5,
+
+      override_label : "",
+
+      dial_offset : 0,
+      background_fill : "",
+      font_size: 36,
+      rounding : 2,
+
+      //
+      limit_low : NaN,
+      limit_high : NaN,
+    };
+
+    for(const p in parameters){ this.params[p] = parameters[p]; };
+
+    // =========================================================================
+		// OTHER
+		// =========================================================================
+    this.object = (typeof object === "string" ? document.getElementById(object) : object);
+
+    this.current_value = (this.params.max_val + this.params.min_val) * 0.5;
+
+    // use this for advanced dial
+    this.forced_min_value = NaN;
+    this.forced_max_value = NaN;
 
 		// ===============================================================================
 		// DRAW CONTROL
 		// ===============================================================================
 
 		this.draw = function(){
+      let params_color = this.params.color in Subtle.COLORS ? Subtle.COLORS[this.params.color] : this.params.color;
+      let params_background_color = this.params.background_color in Subtle.COLORS ? Subtle.COLORS[this.params.background_color] : this.params.background_color;
+      let params_hand_color = this.params.hand_color in Subtle.COLORS ? Subtle.COLORS[this.params.hand_color] : this.params.hand_color;
 
-      let jc = {"left":"flex-start", "fill":"space-evenly", "center":"center"}[this.params.position];
+      var height = this.object.offsetHeight;
+      var width = this.object.offsetWidth;
 
-      let prt_ = '<div style="display:flex; flex-direction:column; justify-content: ' + jc + '; height: 100%; width: 100%;">';
-      let str_ = '<div style="width:100%;">';
+			let svg_ = '';
+      const pi = Math.PI;
 
-      str_ += '<div class="tabs_layout_container" style="display: ' + (this.params.direction == "vertical" ? "block" : "flex") + '; direction:' +' align-content: stretch; justify-content: ' + jc + ';">';
+			// 1) draw control
+			// ===============
+			let cx = width * 0.5;
+			let cy = height * 0.5;
+			let ry = (width > height ? (height * 0.5) : (width * 0.5)) - this.params.stroke_width;
+			let rx = ry;
+      //let s = (this.params.opening_angle > 28.6478 ? 28.6478 : this.params.opening_angle) * pi / 180;
+      let s = (this.params.opening_angle == 1 ? 0.99999 : this.params.opening_angle) * 0.5;
+      let t1 = pi * (1 - s);
+			let delt1 = 3*pi - 2*t1;
+      let delt2 = (3*pi - 2*t1) * (this.current_value - this.params.min_val) / (this.params.max_val - this.params.min_val);
+      let phi = 0;
 
-      let w = this.params.icon_size;
-      for(const t in tabs){
-        // create flex container
-        str_ += '<div id="tab_' + tabs[t].div + '" class="no-selectable tab-item" style="width:' + (this.params.show_labels_inline || this.params.direction == "vertical" ? 'auto' : w*2+10 + 'px' ) + '; flex-direction:' + (this.params.show_labels_inline ? 'row' : 'column') + '; ">';
+      // angles for limits
+      let delt_low = (!Number.isNaN(this.params.limit_low)) ? ((3*pi - 2*t1) * (this.params.limit_low - this.params.min_val) / (this.params.max_val - this.params.min_val) + t1) : t1;
+      let delt_high= (!Number.isNaN(this.params.limit_high)) ? ((3*pi - 2*t1) * (this.params.limit_high - this.params.min_val) / (this.params.max_val - this.params.min_val) + t1) : delt1+t1;
 
-        // add icons
-        if(this.params.show_icons){
-          str_ += '<div style="font-size:' + w + 'px; height:' + w*1 + 'px; line-height:' + (w) + 'px">' + tabs[t].icon + '</div>';
+      t1 = t1 + this.params.dial_offset;
+
+      // styles for background and main arc
+      let style_bg = { stroke_color: params_background_color, stroke_width : this.params.stroke_width, stroke_linecap: this.params.linecap }
+      let style_mn = { stroke_color: params_color, stroke_width : this.params.stroke_width-this.params.inner_padding*2, stroke_linecap: this.params.linecap }
+      // styles for limits
+      let shade_color = Subtle.COLOR_MODE == "dark" ? "#EDEDED" : "#959595";
+      let style_l0 = { stroke_color: shade_color, stroke_width : this.params.stroke_width, stroke_linecap: "butt" }
+      let style_l1 = { stroke_color: shade_color, stroke_width : this.params.stroke_width, stroke_linecap: "round" }
+
+      // circle background
+      if(this.params.background_fill != ""){
+        svg_ += Subtle.svg_ellipsearc(cx,cy,rx-this.params.stroke_width*0.7,ry-this.params.stroke_width*0.7,t1,delt1,phi,{fill_color:this.params.background_fill, stroke_width:0 });
+      }
+
+      // background arc
+      svg_ += Subtle.svg_ellipsearc(cx,cy,rx,ry,t1,delt1,phi,style_bg);
+
+      // limits
+      if(this.params.dial_offset == 0){
+        if(!Number.isNaN(this.params.limit_low) && !Number.isNaN(this.params.limit_high)){
+          svg_ += Subtle.svg_ellipsearc(cx,cy,rx,ry,delt_low,delt_high-delt_low,phi,style_l0);
         }
+        else if(!Number.isNaN(this.params.limit_high)){
+          svg_ += Subtle.svg_ellipsearc(cx,cy,rx,ry,delt_low,delt_high-delt_low,phi,style_l0);
+          svg_ += Subtle.svg_ellipsearc(cx,cy,rx,ry,delt_low,(delt_high-delt_low)*0.5,phi,style_l1);
+        }
+        else if(!Number.isNaN(this.params.limit_low)){
+          svg_ += Subtle.svg_ellipsearc(cx,cy,rx,ry,delt_low,delt_high-delt_low,phi,style_l0);
+          svg_ += Subtle.svg_ellipsearc(cx,cy,rx,ry,delt_low+(delt_high-delt_low)*0.5,(delt_high-delt_low)*0.5,phi,style_l1);
+        }
+      }
 
-        // add labels
-        if(this.params.show_labels){
-          if(this.params.show_labels_inline){
-            str_ += '<div style="font-size:12px; padding-left:' + (this.params.show_icons ? '10' : '0') + 'px;">';
+      // main arc
+      if(!Number.isNaN(this.forced_min_value) && !Number.isNaN(this.forced_max_value)){
+        let forced_min = (3*pi - 2*t1) * (this.forced_min_value - this.params.min_val) / (this.params.max_val - this.params.min_val);
+        let forced_max = (3*pi - 2*t1) * (this.forced_max_value- this.params.min_val) / (this.params.max_val - this.params.min_val);
+        svg_ += Subtle.svg_ellipsearc(cx,cy,rx,ry,t1+forced_min,forced_max-forced_min,phi,style_mn);
+      } else {
+        svg_ += Subtle.svg_ellipsearc(cx,cy,rx,ry,t1,delt2,phi,style_mn);
+      }
+
+
+			// 2) draw value inside
+			// ====================
+      if(this.params.show_label)
+      {
+        // get style
+        let text_style = { center_vertically: true, anchor: 'middle' };
+        if(this.params.font_size > 0) text_style.font_size = this.params.font_size + "px";
+        let unit_style = {center_vertically: true, color: "gray",anchor: 'middle', font_size: "24px"};
+
+        // set label text to value+units or overriden label text
+        let label = Subtle.ROUND(this.current_value, this.params.rounding);
+        if(this.params.override_label != "") { label = this.params.override_label }
+
+        // if hand is visible, display text on bottom, else display on center
+        if(this.params.show_hand){
+          svg_ += Subtle.svg_text(cx, cy+rx*0.9, label, text_style);
+        }else{
+
+          if(this.params.units != ""){
+            svg_ += Subtle.svg_text(cx, cy - 10, label, text_style);
+            svg_ += Subtle.svg_text(cx, cy + 20, this.params.units, unit_style )
           } else {
-            str_ += '<div style="font-size:12px; margin-top: 5px;">';
+            svg_ += Subtle.svg_text(cx, cy, label, text_style);
           }
-          str_ += tabs[t].label + '</div>';
+
         }
 
-        str_ += '</div>';
-
-        // hide all tab divs
-        let dv = document.getElementById(tabs[t].div);
-        dv.style.height = "100%";
-        dv.style.width = "100%";
-        dv.style.display = "none";
       }
 
-      str_ += '</div>';
-      str_ += '</div>';
-
-
-      //
-      let inner_html = this.object.innerHTML;
-      let result = prt_ + str_ + inner_html + "</div>";
-      if(this.params.dock_bottom){
-        result = prt_ + inner_html + str_ + "<div>";
-      }
-			this.object.innerHTML = result;
-
-      // clicks
-      var parent = this;
-      for(const t in tabs){
-        this.object.getElementsByClassName("tabs_layout_container")[0].childNodes[t].onclick = function(){ parent.select_tab(t) };
+      // 3) draw hand
+			// ============
+      if(this.params.show_hand){
+        svg_ += Subtle.svg_dial_hand(cx, cy, rx, (delt2-0.5*delt1)*180/pi, params_hand_color);
       }
 
-      this.select_tab(0);
+
+			// return
+			this.object.innerHTML = Subtle.svg_markup(width, height, svg_);
 		}
 
-    this.select_tab = function(tabid){
-      var parent = this;
-      //
-      for(const s in parent.tabs){
-        document.getElementById(parent.tabs[s].div).style.display = "none";
-        parent.object.getElementsByClassName("tabs_layout_container")[0].childNodes[s].style.color = Subtle.COLORS["text"];
-      }
-      document.getElementById(parent.tabs[tabid].div).style.display = "block";
-      parent.object.getElementsByClassName("tabs_layout_container")[0].childNodes[tabid].style.color = Subtle.COLORS["primary"];
-
-      if(parent.tabs[tabid].onselect){
-        parent.tabs[tabid].onselect();
-      }
-
+    this.update = function(value){
+      this.current_value = value;
+      if(value > this.params.max_val) this.current_value = this.params.max_val;
+  		if(value < this.params.min_val) this.current_value = this.params.min_val;
+  		this.draw();
     }
-
-    this.draw()
-
-
 
 	}
 }
 
 
-//fillbar.js
-Subtle.FillBar = class FillBar{
+//logger.js
+Subtle.Logger = class Logger{
 
-    constructor(object, parameters){
-
-      this.params = {
-        min_val : 0,
-        max_val : 1,
-
-        vertical : false,
-        color: "primary",
-        background_color: "control",
-        smooth : false,
-        border_radius : 10,
-        bar_width : 28,
-        font_size : 14,
-
-        show_label : true,
-        units : "",
-
-        rounding : 2,
-
-      };
-
-      for(const p in parameters){ this.params[p] = parameters[p]; };
-
-      // =========================================================================
-  		// OTHER
-  		// =========================================================================
-      this.object = (typeof object === "string" ? document.getElementById(object) : object);
-
-      this.value = this.params.min_val;
-
-      // =========================================================================
-  		// DRAW CONTROL
-  		// =========================================================================
-      this.draw = function(){
-        let params_color = this.params.color in Subtle.COLORS ? Subtle.COLORS[this.params.color] : this.params.color;
-        let params_background_color = this.params.background_color in Subtle.COLORS ? Subtle.COLORS[this.params.background_color] : this.params.background_color;
-
-        let ctr_ = '';
-
-        //
-        ctr_ = '<div class="fillbar_parent">';
-
-        //
-        let style = 'style="';
-        style += 'border-radius:' + this.params.border_radius + 'px;';
-        style += (this.params.vertical ? 'width:' : 'height:') + this.params.bar_width + 'px;';
-        style += 'background-color:' + params_background_color + ';';
-        style += 'font-size:' + this.params.font_size + 'px;';
-        style += '"';
-        ctr_ += '<div class="' + (this.params.vertical ? 'fillbar_v' : 'fillbar') + '" ' + style + '>';
-
-        //
-        style = 'style="';
-        style += 'background-color:' + params_color + ';';
-        if(this.params.vertical){
-            style += 'border-bottom-right-radius:' + this.params.border_radius + 'px;';
-            style += 'border-bottom-left-radius:' + this.params.border_radius + 'px;';
-            style += 'height:' + (100 * this.value / (this.params.max_val - this.params.min_val)) + '%;';
-            style += 'width:' + this.params.bar_width + 'px;';
-        } else {
-          style += 'border-top-left-radius:' + this.params.border_radius + 'px;';
-          style += 'border-bottom-left-radius:' + this.params.border_radius + 'px;';
-          style += 'width:' + (100 * this.value / (this.params.max_val - this.params.min_val)) + '%;';
-          style += 'height:' + this.params.bar_width + 'px;';
-          style += 'line-height:' + this.params.bar_width + 'px;';
-        }
-        if(this.params.smooth){ style += 'transition: width 0.5s, height 0.5s;' }
-        style += '"';
-        ctr_ += '<div class="' + (this.params.vertical ? 'fillbar_v' : 'fillbar') + '" ' + style + '>';
-
-        //
-        if(this.params.show_label) { ctr_ += Subtle.ROUND(this.value, this.params.rounding) + this.params.units.toString(); }
-
-        //
-        ctr_ += '</div></div></div>';
-
-        this.object.innerHTML = ctr_;
-    }
-
-    this.update = function(value){
-
-      if(Number.isNaN(this.value)) { this.value = value; this.draw() };
-      this.value = value;
-      
-      let bar = this.object.childNodes[0].childNodes[0].childNodes[0];
-      if(this.params.vertical){
-        bar.style.height = (100 * this.value / (this.params.max_val - this.params.min_val)) + "%";
-      }
-      else{
-        bar.style.width =  (100 * this.value / (this.params.max_val - this.params.min_val)) + "%";
-      }
-
-      if(this.params.show_label){
-        bar.innerHTML = Subtle.ROUND(this.value, this.params.rounding) + this.params.units.toString();
-      }
-
-
-    }
-
-    // autoinitilize
-    this.draw();
-  }
-}
-
-
-//sparkline.js
-Subtle.Sparkline = class Sparkline{
-
-  constructor(object, parameters = {}){
+  constructor(object, parameters){
 
     this.params = {
-      fade: true,
-      value_on_left: false,
-      endpoint: true,
-      glow: false,
+      show_stems : true,
+      show_timestamp : false,
+      max_length : 100,
     };
 
-    for(const p in parameters){ this.params[p] = parameters[p] }
+    for(const p in parameters){ this.params[p] = parameters[p]; };
 
-    ////////////////////
-
+    // =========================================================================
+    // OTHER
+    // =========================================================================
     this.object = (typeof object === "string" ? document.getElementById(object) : object);
+    this.object.style.overflowY = "scroll";
 
-    var tc = new Subtle.TimePlot(object, this.params);
+    this.records = [];
 
-    this.draw = function(){ tc.draw() }
-    this.update = function(value, time = ""){ tc.update(value, time) }
+    // =========================================================================
+    // DRAW CONTROL
+    // =========================================================================
+    this.draw = function(){
+      let ctr_ = '<table class="logger">';
 
-  }
+      for(const r in this.records){
 
-}
+        // define color
+        let color = this.records[r].color;
+        if(color in Subtle.COLORS) color = Subtle.COLORS[color];
+        let bg = 'background-color:' + color + ';';
 
+        // define icon
+        let ic = '<img src="' + this.records[r].icon + '" />';
+        if(["info","warning","error"].includes(this.records[r].icon)) ic = Subtle.svg_icon(this.records[r].icon, "#FFFFFF");
 
-//plotly.js
-Subtle.PlotlyObject = class PlotlyObject{
+        ctr_ += '<tr>';
 
-    constructor(object, parameters){
+        ctr_ += '<td style="width:30px">';
+        ctr_ += '<div class="logger-item" style="' + bg + '"><div style="margin:2px">' + ic + '</div></div>';
+        ctr_ += '</td>';
+        ctr_ += '<td style="padding-left:10px">';
+        ctr_ += '<b>' + this.records[r].title + '</b>';
+        ctr_ += '</td>';
 
-        this.obj = (typeof object === "string" ? document.getElementById(object) : object);
+        ctr_ += '</tr>';
+        ctr_ += '<tr>';
 
-        this.traces = [];
+        ctr_ += '<td style="width:30px">';
 
-        //this.annotations = [];
-
-        this.layout = {
-            margin: { l: 30, r: 20, b: 30, t: 30, pad: 5 },
-            showlegend: false,
-            legend: { orientation: "h", x:0, y:1.2 },
-            xaxis: { title: "" },
-            yaxis: { title: "" },
-            dragmode: 'zoom',
-            hovermode: 'closest',
+        if(this.params.show_stems && r != this.records.length-1){
+          ctr_ += '<div class="logger-stem" style="background-color:' + Subtle.COLORS["control"] + '"></div>';
         }
 
-        for(const p in parameters){ this.layout[p] = parameters[p]; };
+        ctr_ += '</td>';
 
-        this.options = {
-            displaylogo: false,
-            displayModeBar: false,
+        ctr_ += '<td style="padding-left:10px">';
+        ctr_ += '<div style="padding-bottom:15px; padding-top:2px; font-size:14px">' + this.records[r].text;
+        if(this.params.show_timestamp && this.records[r].timestamp != ""){
+          ctr_ += '<div style="padding-top:4px; font-size:12px">' + this.records[r].timestamp + '</div>';
         }
+        ctr_ += '</div>';
+        ctr_ += '</td>';
 
-        this.pie_chart_index = 0;
+        ctr_ += '</tr>';
 
+      }
+
+      ctr_ += '</table>';
+      this.object.innerHTML = ctr_;
     }
 
-    draw(){
-        //this.layout.annotations = this.annotations;
-        this.traces.sort(function(a, b){return a.zindex-b.zindex});
-        Plotly.newPlot(this.obj, this.traces, this.layout, this.options);
+    this.update = function(icon, title, text, timestamp = "", color = ""){
+      if(icon in Subtle.COLORS && color == ""){ color = Subtle.COLORS[icon]; }
+
+      this.records.splice(0, 0, {icon: icon, title: title, text: text, timestamp: timestamp, color:color });
+
+      while(this.records.length > this.params.max_length){ this.records.pop() }
+
+      this.draw()
     }
 
-    /////////////////////////////////////////////////////////////////////
-
-    add_text(x, y, text, parameters){
-
-        if(!(x instanceof Array)){ x = [x] }
-        if(!(y instanceof Array)){ y = [y] }
-        if(!(text instanceof Array)){ text = [text] }
-
-        let params_ = {
-            x: x,
-            y: y,
-            mode: 'text',
-            text: text,
-            textposition: "middle center", //top,middle,bottom left,center,right
-            showlegend: false,
-            //textangle: 0,
-            //showarrow: false,
-            //align: "center", // left, center, right
-            //valign: "middle", //top, middle, bottom
-            zindex: 9999,
-        }
-
-        for(const p in parameters){ params_[p] = parameters[p]; };
-
-        //this.annotations.push(params_);
-        this.traces.push(params_);
-
-        return;
+    this.clear = function(){
+      this.records = [];
+      this.draw();
     }
 
-    add_scatter(data, parameters){
-        /*
-        data = [[x0, x1, x2, ... , xn], [y0, y1, y2, ... , yn]]
-        */
-
-        let params_ = {
-            name: "",
-            color: Subtle.COLORS["primary"][this.traces.length],
-            show_markers: false,
-            show_lines: true,
-            plot_area: false, // fill area below the graph
-            plot_manhattan: false, // make line manhattan
-            plot_spline: false, // make line a spline
-            line_stroke: 2,
-            marker_symbol: "circle",
-            marker_size: 6,
-            zindex: 0,
-        }
-
-        for(const p in parameters){ params_[p] = parameters[p]; };
-
-        let line_shape = "linear";
-        if(params_.plot_manhattan) line_shape = "hv";
-        if(params_.plot_spline) line_shape = "spline";
-
-        let mode = "lines+markers";
-        if(params_.show_lines && !params_.show_markers) mode = "lines";
-        if(!params_.show_lines && params_.show_markers) mode = "markers";
-        if(!params_.show_lines && !params_.show_markers) return;
-
-        this.traces.push({
-            type: 'scatter',
-            x: data[0],
-            y: data[1],
-            mode: mode,
-            fill: params_.plot_area ? "tozeroy" : "none",
-            name: params_.name,
-
-            marker: {
-                color: params_.color,
-                symbol: params_.marker_symbol,
-                size: params_.marker_size,
-            },
-            line: {
-                color: params_.color,
-                shape: line_shape,
-                width: params_.line_stroke,
-            },
-            zindex: params_.zindex,
-        });
-
-        return;
-    }
-
-    add_columnchart(data, parameters){
-        /*
-            data = [ [x0, x1, x2, x3, ... , xn], [y0, y1, y2, y3, ... , yn] ]
-        */
-
-        let params_ = {
-            name: "",
-            color: Subtle.COLOR_PALETTES["main"][this.traces.length],
-            zindex: 0,
-        }
-
-        for(const p in parameters){ params_[p] = parameters[p]; };
-
-        this.traces.push({
-            type: 'bar',
-            x: data[0],
-            y: data[1],
-            name: params_.name,
-            marker: { color: params_.color },
-            zindex: params_.zindex,
-        });
-
-        return;
-    }
-
-    add_piechart(data, parameters){
-        /*
-            data = [ [label0, label1, label2, label3, ... , labeln], [y0, y1, y2, y3, ... , yn] ]
-        */
-
-        let params_ = {
-            name: "",
-            colors: Subtle.COLOR_PALETTES["main"],
-            donut: false,
-            show_labels: true,
-            zindex: 0,
-        }
-
-        for(const p in parameters){ params_[p] = parameters[p]; };
-
-        this.traces.push({
-            name: params_.name,
-            type: 'pie',
-            values: data[1],
-            labels: data[0],
-            hole: params_.donut ? 0.4 : 0,
-            textinfo: params_.show_labels ? 'label+percent' : 'percent',
-
-            marker: {
-                colors: params_.colors,
-            },
-            domain: {
-                row: 0,
-                column: this.pie_chart_index,
-            },
-
-            zindex: params_.zindex,
-        });
-
-        this.pie_chart_index += 1;
-        this.layout.grid = {rows: 1, columns: this.pie_chart_index}
-
-        return;
-    }
-
-    /*add_gantt(data, parameters){
-
-            //data = [ [t0, t1, y0], [t1, t2, y1], [t5, t6, y5], ... ]
-
-
-        let params_ = {
-            name: "",
-            colors: Subtle.COLORS["primary"],
-            color_by_values: false,
-            show_value: true,
-            width: 20,
-            zindex: 0,
-        }
-
-        for(const p in parameters){ params_[p] = parameters[p]; };
-
-        for(const s in data){
-
-            let line_color = params_.colors;
-            if(typeof params_.colors !== "string"){
-                if(params.color_by_values){
-                    let v = data[s][2]
-                    line_color = params_.colors[v];
-                } else {
-                    line_color = params_.colors[s];
-                }
-            }
-
-            this.traces.push({
-                type: 'scatter',
-                mode: 'lines',
-                x: [ data[s][0] , data[s][1] ],
-                y: [ params_.name , params_.name ],
-                line: { color: line_color, width: params_.width },
-                zindex: params_.zindex,
-            });
-        }
-
-        return;
-    }*/
-
-    add_boxandwhiskers(data, parameters){
-        /*
-            data = [ y0, y1, y2, y3, y4, y5, y6, ... ]
-        */
-
-        let params_ = {
-            name: "",
-            color: Subtle.COLORS["primary"],
-            show_outliers: true,
-            show_mean: true,
-            zindex: 0,
-        }
-
-        for(const p in parameters){ params_[p] = parameters[p]; };
-
-        this.traces.push({
-            type: 'box',
-            y: data,
-            x: params_.name,
-            name: params_.name,
-            boxpoints: params_.show_outliers ? 'Outliers' : false,
-            boxmean: params_.show_mean,
-
-            marker: {
-                color: params_.color,
-            },
-            zindex: params_.zindex,
-        });
-
-        return;
-    }
-
-    add_heatmap(data, parameters){
-        /*
-            data = [
-                [A1, B1, C1, D1, E1],
-                [A2, B2, C2, D2, E2],
-                [A3, B3, C3, D3, E3],
-                [A4, B4, C4, D4, E4],
-            ]
-        */
-
-        let params_ = {
-            x: [],
-            y: [],
-            colors: Subtle.COLORS["primary"],
-            show_scale : true,
-            zindex: 0,
-        }
-
-        for(const p in parameters){ params_[p] = parameters[p]; };
-
-        let colorscale = params_.colors;
-        if(typeof params_.colors == "string"){
-            colorscale = [[0, "#fff"], [1, params_.colors]];
-        }
-
-        this.traces.push({
-            type: 'heatmap',
-            z: data,
-            x: params_.x,
-            y: params_.y,
-
-            colorscale: colorscale,
-            showscale: params_.show_scale,
-            zindex: params_.zindex,
-        });
-
-        return;
-    }
-
-    add_histogram(data, parameters){
-        /*
-            data = [ y0, y1, y2, y3, y4, y5, y6, ... ]
-        */
-
-        let params_ = {
-            nbins : 0,
-            zindex: 0,
-            color: Subtle.COLORS["primary"],
-        }
-
-        for(const p in parameters){ params_[p] = parameters[p]; };
-
-        this.traces.push({
-            type: 'histogram',
-            x: data,
-            nbinsx: params_.nbins,
-            marker: {
-                color: params_.color
-            },
-            zindex: params_.zindex,
-        });
-
-        return;
-    }
-}
-
-
-//rounding.js
-Subtle.ROUNDING = 2;
-
-Subtle.ROUND = function(number, dec = -1){
-  if(dec == -1) dec = Subtle.ROUNDING;
-  if(typeof number != "number") return number;
-  let d = {
-    0: 1,
-    1: 10,
-    2: 100,
-    3: 1000,
-    4: 10000,
-    5: 100000,
-    6: 1000000,
-  }
-  return Math.round(number * d[dec]) / d[dec];
-}
-
-
-//colors.js
-// =============================================================================
-// SET COLOR MODE
-// =============================================================================
-Subtle.COLOR_MODE = "light";
-
-Subtle.SET_COLOR_MODE = function(mode = "dark"){
-  Subtle.COLOR_MODE = mode;
-  if(mode == "dark") Subtle.COLORS = Subtle.DARK_MODE;
-  else if(mode == "light") Subtle.COLORS = Subtle.LIGHT_MODE;
-
-  document.getElementsByTagName("body")[0].style.backgroundColor = Subtle.COLORS["background"];
-  document.getElementsByTagName("body")[0].style.color = Subtle.COLORS["text"];
-}
-
-Subtle.SET_COLOR = function(color, key = "primary"){
-  Subtle.LIGHT_MODE[key] = color;
-  Subtle.DARK_MODE[key] = color;
-
-  if(key == "primary"){
-    for(const p in Subtle.COLOR_PALETTES){
-      
-    }
-  }
-
-  if(key=="primary") Subtle.INSERT_COLOR_IN_COLOR_PALETTES(color);
-}
-
-Subtle.INSERT_COLOR_IN_COLOR_PALETTES = function(color){
-  for(const p in Subtle.COLOR_PALETTES){
-    Subtle.COLOR_PALETTES[p].splice(0,0,color);
-  }
-}
-
-Subtle.GET_COLOR = function(color){
-  if(color in Subtle.COLORS) { return Subtle.COLORS[color] }
-  return color;
-}
-
-// =============================================================================
-// MAIN COLORS
-// =============================================================================
-Subtle.LIGHT_MODE = {};
-Subtle.DARK_MODE = {};
-
-Subtle.COLORS = Subtle.LIGHT_MODE;
-
-// =============================================================================
-// LIGHT MODE
-// =============================================================================
-
-Subtle.LIGHT_MODE["primary"] = "#5bbadc";
-Subtle.LIGHT_MODE["background"] = "#FFFFFF";
-Subtle.LIGHT_MODE["text"] = "#000000";
-Subtle.LIGHT_MODE["contrast"] = "#FFFFFF";
-
-Subtle.LIGHT_MODE["control"] = "#555555";
-Subtle.LIGHT_MODE["inactive"] = "#808080";
-Subtle.LIGHT_MODE["ok"] = "#73d216";
-Subtle.LIGHT_MODE["error"] = "#dc0000";
-Subtle.LIGHT_MODE["info"] = "#0088e8";
-Subtle.LIGHT_MODE["warning"] = "#fbb901";
-Subtle.LIGHT_MODE["inactive"] = "#aea79f";
-
-// =============================================================================
-// DARK MODE
-// =============================================================================
-Subtle.DARK_MODE["primary"] = "#0086b3";
-Subtle.DARK_MODE["background"] = "#121212";
-Subtle.DARK_MODE["text"] = "#FFFFFF";
-Subtle.DARK_MODE["contrast"] = "#FFFFFF";
-
-Subtle.DARK_MODE["control"] = "#A5A5A5";
-Subtle.DARK_MODE["inactive"] = "#808080";
-Subtle.DARK_MODE["ok"] = "#73d216";
-Subtle.DARK_MODE["error"] = "#ff2424";
-Subtle.DARK_MODE["info"] = "#0088e8";
-Subtle.DARK_MODE["warning"] = "#fbb901";
-Subtle.DARK_MODE["inactive"] = "#aea79f";
-
-// =============================================================================
-// COLOR PALETTES
-// =============================================================================
-Subtle.COLOR_PALETTES = {};
-
-Subtle.COLOR_PALETTES["main"] = [
-  "#5bbadc",
-  "#3d5afe",
-  "#00e676",
-  "#76ff03",
-  "#c6ff00",
-  "#ffc400",
-  "#ff3d00",
-  "#f50057",
-  "#d500f9",
-  "#1de9b6",
-];
-
-Subtle.COLOR_PALETTES["alternative"] = [
-  "#d90d39",
-  "#f8432d",
-  "#ff8e25",
-  "#ef55f1",
-  "#c543fa",
-  "#6324f5",
-  "#2e21ea",
-  "#3d719a",
-  "#31ac28",
-  "#96d310",
-];
-
-Subtle.COLOR_PALETTES["creamy"] = [
-  "#ea989d",
-  "#b9d7f7",
-  "#c6bcdd",
-  "#9bfdce",
-  "#bee8bb",
-  "#f9f2c0",
-  "#5f8c96",
-  "#9b91ac",
-  "#ae896f",
-  "#cc6d55",
-];
-
-Subtle.COLOR_PALETTES["contrast"] = [
-  "#8ae234",
-  "#fcaf3e",
-  "#729fcf",
-  "#ad7fa8",
-  "#ef2929",
-  "#4e9a06",
-  "#ce5c00",
-  "#204a87",
-  "#5c3566",
-  "#a40000",
-];
-
-Subtle.COLOR_PALETTES["soft"] = [
-  "#ef9a9a",
-  "#ce93d8",
-  "#b39ddb",
-  "#90caf9",
-  "#80cbc4",
-  "#a5d6a7",
-  "#ffe082",
-  "#ffcc80",
-  "#ffab91",
-  "#b0bec5",
-];
-
-Subtle.COLOR_PALETTES["accent"] = [
-  "#d50000",
-  "#c51162",
-  "#6200ea",
-  "#2962ff",
-  "#00bfa5",
-  "#00c853",
-  "#ffab00",
-  "#ff6b00",
-  "#dd2c00",
-  "#263238",
-];
-
-
-//soundalarm.js
-Subtle.SoundAlarm = class SoundAlarm{
-  constructor(file, parameters){
-    this.params = {
-      loop: true,
-    }
-    for(const p in parameters){ this.params[p] = parameters[p]; }
-
-    this.file = file;
-    this.audio = new Audio(file);
-
-    this.is_playing = false;
-  }
-
-  play(){
-    if(!this.is_playing){
-      this.audio.play();
-      this.is_playing = true;
-    }
-  }
-
-  stop(){
-    audio.stop();
-    if(this.is_playing){
-      this.audio.stop();
-      this.is_playing = true;
-    }
   }
 
 }
