@@ -479,6 +479,7 @@ body {
   min-height: 11.69in;
   background-color: white;
   color: black !important;
+  font-family: "Helvetica" !important;
   line-height: 1.25;
   font-size: 13px;
   /*
@@ -605,8 +606,7 @@ i {
   font-weight: normal;
   font-variant: normal;
   text-transform: none;
-  line-height: 1;
-  vertical-align: middle;
+  line-height: 1.5;
   /* Better Font Rendering =========== */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -2733,7 +2733,6 @@ div.plotly-notifier {
 }
 .font_body, select, input, body {
   font-size: 1rem;
-  font-family: "Helvetica" !important;
 }
 
 .at_font {
