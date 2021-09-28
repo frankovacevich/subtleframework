@@ -162,7 +162,6 @@ table.logger .logger-item {
 .subtletable td {
   padding: 10px;
   border: none;
-  border-bottom: 1px solid #00000033;
   overflow-x: hidden;
   text-overflow: ellipsis;
 }

@@ -175,7 +175,7 @@ table.logger{
   text-align: left;
   border-collapse: collapse;
 
-  td{ padding: 10px; border: none; border-bottom: 1px solid #00000033; overflow-x: hidden; text-overflow: ellipsis;}
+  td{ padding: 10px; border: none; overflow-x: hidden; text-overflow: ellipsis;}
   tr{ border: none; }
   tr:nth-child(2n){ background-color: #00000033; }
   tr:first-child{ font-weight: bold; }
