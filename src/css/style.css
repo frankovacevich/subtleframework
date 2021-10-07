@@ -217,6 +217,7 @@ table.logger .logger-item {
   .grid_layout {
     display: flex;
     flex-direction: column;
+    height: auto;
   }
 }
 .h_layout, .v_layout {
