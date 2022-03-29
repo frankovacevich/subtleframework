@@ -1,0 +1,27 @@
+{
+  "type": "module",
+  "name": "subtleframework",
+  "version": "2.0.0",
+  "description": "A framework for js dashboards",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/frankovacevich/subtleframework.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/frankovacevich/subtleframework/issues"
+  },
+  "homepage": "https://github.com/frankovacevich/subtleframework#readme",
+  "dependencies": {
+    "sass": "^1.49.9",
+    "tinyify": "^3.0.0"
+  }
+}
