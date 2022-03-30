@@ -1,0 +1,44 @@
+.indicator{
+    display: none;
+    background-color: white;
+    border-radius: 5px;
+
+    width: 28px;
+    height: 28px;
+    margin-left: -14px;
+    margin-top: -14px;
+
+    position: fixed;
+    z-index: 6;
+    box-sizing: border-box;
+}
+
+@keyframes fadeinout{ 
+    from {opacity: 0;}
+    50%  {opacity: 1;}
+    to   {opacity: 0;}
+}
+
+.indicator.show{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.indicator.animate{
+    -webkit-animation: fadeinout 1s infinite;
+    animation: fadeinout 1s infinite;
+}
+
+
+
+.indicator i{ font-size: 20px; }
+
+.indicator.info{ border: 2px solid var(--colors-info); }
+.indicator.info i{ color: var(--colors-info); }
+
+.indicator.warning{ border: 2px solid var(--colors-warning); }
+.indicator.warning i{ color: var(--colors-warning); }
+
+.indicator.error{ border: 2px solid var(--colors-error); }
+.indicator.error i{ color: var(--colors-error); }

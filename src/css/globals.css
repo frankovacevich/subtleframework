@@ -1,0 +1,12 @@
+:root {
+    --colors-primary: #5bbadc;
+    --colors-info: #0088e8	;
+    --colors-error: #dc0000;
+    --colors-warning: #fbb901;
+}
+
+.tippy-tip{
+    display: block;
+    padding-top: 5px;;
+    font-size: 14px !important;
+}
