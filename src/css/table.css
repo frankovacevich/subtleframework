@@ -1,0 +1,25 @@
+.subtletable{
+    width: 100%;
+    table-layout: fixed;
+    text-align: left;
+    border-collapse: collapse;
+}
+
+.subtletable td{ 
+    padding: 10px; 
+    border: none; 
+    overflow-x: hidden; 
+    text-overflow: ellipsis;
+}
+
+.subtletable tr{ 
+    border: none; 
+}
+
+.subtletable tr:nth-child(2n){ 
+    background-color: #00000033; 
+}
+
+.subtletable .btn{
+    color: red
+}
