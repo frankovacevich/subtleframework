@@ -49,6 +49,8 @@ class Indicator{
         console.log(rect);
         indicator_div.style.left = rect.right + "px";
         indicator_div.style.top  = rect.top + "px";
+
+        return this;
     }
 
     hide(){

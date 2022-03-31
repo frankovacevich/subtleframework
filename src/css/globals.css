@@ -1,8 +1,26 @@
 :root {
     --colors-primary: #5bbadc;
-    --colors-info: #0088e8	;
+    --colors-accent: #5bbadc;
+
+    --colors-info: #0088e8;
     --colors-error: #dc0000;
     --colors-warning: #fbb901;
+
+    --colors-font: black;
+    --colors-background: #ffffff;
+}
+
+[data-theme="dark"] {
+    --colors-primary: #5bbadc;
+    --colors-accent: #5bbadc;
+
+    --colors-info: #0088e8;
+    --colors-error: #ff2424;
+    --colors-warning: #fbb901;
+
+    --colors-font: #ffffff;
+    --colors-background: #121212
+    ;
 }
 
 .tippy-tip{
@@ -10,3 +28,13 @@
     padding-top: 5px;;
     font-size: 14px !important;
 }
+
+.no-selectable{ 
+    -webkit-touch-callout: none; 
+    -webkit-user-select: none; 
+    -khtml-user-select: none; 
+    -moz-user-select: none; 
+    -ms-user-select: none; 
+    user-select: none; 
+}
+

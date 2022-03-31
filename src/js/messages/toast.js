@@ -6,6 +6,8 @@ class Toast{
     // DRAW CONTROL
     // =========================================================================
     show(toast_class, text){
+
+        // create div
         var toast_div = document.getElementById("s-toast");
         if(!toast_div){
             toast_div = document.createElement('div');
@@ -16,15 +18,23 @@ class Toast{
             return;
         }
 
+        // set text
         toast_div.innerHTML = text;
+
+        // set class
         if(toast_class != ""){toast_div.classList.add(toast_class);}
+
+        // show
         toast_div.classList.add("show");
 
+        // remove after 5 seconds
         var tout = setTimeout(function(){ 
-            toast_div.classList.remove(toast_class); 
+            if(toast_class != ""){ toast_div.classList.remove(toast_class); }
             toast_div.classList.remove("show");
             clearTimeout(tout); 
         }, 5000);
+
+        return this;
     }
 }
 

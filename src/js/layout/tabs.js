@@ -49,14 +49,14 @@ class TabsLayout {
         str_ += '<div class="tabs-layout-container" style="display: ' + (this.params.direction == "vertical" ? "block" : "flex") + '; direction:' +' align-content: stretch; justify-content: ' + jc + ';">';
         
         let w = this.params.icon_size;
-        for(const t in tabs){
+        for(const t in this.tabs){
             
             // create flex container
-            str_ += '<div id="tab_' + tabs[t].div + '" class="no-selectable tab-item" style="width:' + (this.params.show_labels_inline || this.params.direction == "vertical" ? 'auto' : w*2+10 + 'px' ) + '; flex-direction:' + (this.params.show_labels_inline ? 'row' : 'column') + '; ">';
+            str_ += '<div id="tab_' + this.tabs[t].div + '" class="no-selectable tab-item" style="width:' + (this.params.show_labels_inline || this.params.direction == "vertical" ? 'auto' : w*2+10 + 'px' ) + '; flex-direction:' + (this.params.show_labels_inline ? 'row' : 'column') + '; ">';
             
             // add icons
             if(this.params.show_icons){
-                str_ += '<div class="tab-icon" style="font-size:' + w + 'px; height:' + w*1 + 'px; line-height:' + (w) + 'px">' + tabs[t].icon + '</div>';
+                str_ += '<div class="tab-icon" style="font-size:' + w + 'px; height:' + w*1 + 'px; line-height:' + (w) + 'px">' + this.tabs[t].icon + '</div>';
             }
             
             // add labels
@@ -66,13 +66,13 @@ class TabsLayout {
                 } else {
                     str_ += '<div class="tab-text" style="margin-top: 5px;">';
                 }
-                str_ += tabs[t].label + '</div>';
+                str_ += this.tabs[t].label + '</div>';
             }
             
             str_ += '</div>';
             
             // hide all tab divs
-            let dv = document.getElementById(tabs[t].div);
+            let dv = document.getElementById(this.tabs[t].div);
             dv.style.height = "100%";
             dv.style.width = "100%";
             dv.style.display = "none";
@@ -92,7 +92,7 @@ class TabsLayout {
         
         // clicks
         var parent = this;
-        for(const t in tabs){
+        for(const t in this.tabs){
             this.object.getElementsByClassName("tabs-layout-container")[0].childNodes[t].onclick = function(){ parent.select_tab(t) };
         }
         
@@ -104,10 +104,12 @@ class TabsLayout {
         //
         for(const s in parent.tabs){
             document.getElementById(parent.tabs[s].div).style.display = "none";
-            parent.object.getElementsByClassName("tabs-layout-container")[0].childNodes[s].style.color = "black";
+            //parent.object.getElementsByClassName("tabs-layout-container")[0].childNodes[s].style.color = "var(--colors-font)";
+            parent.object.getElementsByClassName("tabs-layout-container")[0].childNodes[s].classList.remove("selected");
         }
         document.getElementById(parent.tabs[tabid].div).style.display = "block";
-        parent.object.getElementsByClassName("tabs-layout-container")[0].childNodes[tabid].style.color = "var(--colors-primary)";
+        //parent.object.getElementsByClassName("tabs-layout-container")[0].childNodes[tabid].style.color = "var(--colors-primary) !important";
+        parent.object.getElementsByClassName("tabs-layout-container")[0].childNodes[tabid].classList.add("selected");
         
         if(parent.tabs[tabid].onselect){
             parent.tabs[tabid].onselect();
